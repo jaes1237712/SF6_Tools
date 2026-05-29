@@ -1,0 +1,63 @@
+[
+    {
+        "empty": false,
+        "id": 1,
+        "timeline": [
+            "64f : 5",
+            "9f : 6",
+            "34f : 5",
+            "49f : 4",
+            "22f : 7",
+            "108f : 4",
+            "470f : 5",
+            "2f : 2",
+            "2f : 3",
+            "4f : 6",
+            "1f : 6 + LP + MP",
+            "39f : 5 + LP + MP",
+            "1134f : 5",
+            "20f : 6",
+            "37f : 9",
+            "7f : 6",
+            "13f : 5",
+            "178f : 4",
+            "1407f : 5"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 2,
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 3,
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 4,
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 5,
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 6,
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 7,
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 8,
+        "weight": 1
+    }
+]

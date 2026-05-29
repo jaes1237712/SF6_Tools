@@ -1,0 +1,21 @@
+{
+    "block_stun_grace": 10,
+    "hud_auto_scale": true,
+    "hud_base_size": 20.24,
+    "hud_n_global_y": -0.337,
+    "hud_n_offset_score": 0,
+    "hud_n_offset_status_y": 0,
+    "hud_n_offset_timer": 0,
+    "hud_n_offset_total": 0,
+    "hud_n_spacing_y": 0.02800000086426735,
+    "hud_n_spread_score": 0.09000000357627869,
+    "observation_window": 120,
+    "session_mode": "trials",
+    "show_debug": false,
+    "show_floating": true,
+    "timer_font_size": 80,
+    "timer_hud_y": -0.46,
+    "timer_minutes": 3,
+    "timer_offset_x": 0,
+    "trial_count": 10
+}

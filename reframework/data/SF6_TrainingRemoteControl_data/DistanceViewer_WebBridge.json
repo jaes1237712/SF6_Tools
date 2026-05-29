@@ -1,0 +1,27 @@
+{
+  "_prefs": {
+    "0": {
+      "Ingrid": {
+        "low": {
+          "input": "5HP",
+          "ar": 179.7713623046875
+        }
+      }
+    }
+  },
+  "_web_timestamp": 1780061349.6025019,
+  "_aa": {
+    "move_input": "",
+    "set_sub": {
+      "input": "5LK",
+      "active": false
+    }
+  },
+  "p1_show_all": true,
+  "p2_show_all": true,
+  "_teleport": {
+    "attacker_id": 0,
+    "distance": 114,
+    "is_throw": false
+  }
+}

@@ -1,0 +1,116 @@
+{
+    "activate_on_load": false,
+    "char_name": "Ryu",
+    "combo_files": [
+        "Ryu_COMBO_1070_D0_SA0.json",
+        "Ryu_COMBO_1070_D0_SA0_20260420_001125.json",
+        "Ryu_COMBO_1420_D1.6_SA0.json",
+        "Ryu_COMBO_1600_D0_SA0.json",
+        "Ryu_COMBO_1900_D0_SA0.json",
+        "Ryu_COMBO_1960_D0_SA0.json",
+        "Ryu_COMBO_2000_D0_SA0.json",
+        "Ryu_COMBO_2000_D2.7_SA0.json",
+        "Ryu_COMBO_2000_D2.8_SA0.json",
+        "Ryu_COMBO_2240_D1.1_SA0.json",
+        "Ryu_COMBO_2420_D1_SA0.json",
+        "Ryu_COMBO_2480_D1_SA0.json",
+        "Ryu_COMBO_2538_D6_SA0.json",
+        "Ryu_COMBO_2699_D3_SA0.json",
+        "Ryu_COMBO_2768_D1_SA0.json",
+        "Ryu_COMBO_2784_D4_SA0.json",
+        "Ryu_COMBO_2810_D2_SA0.json",
+        "Ryu_COMBO_2870_D2.7_SA0.json",
+        "Ryu_COMBO_2880_D2.8_SA0.json",
+        "Ryu_COMBO_3256_D6_SA0.json",
+        "Ryu_COMBO_3480_D0_SA0.json",
+        "Ryu_COMBO_3600_D2_SA1.json",
+        "Ryu_COMBO_3664_D6_SA0.json",
+        "Ryu_COMBO_5984_D6_SA3.json",
+        "Ryu_COMBO_6234_D6_SA3.json",
+        "Ryu_COMBO_6594_D6_SA2.5.json",
+        "Ryu_COMBO_7171_D6_SA2.5.json",
+        "Ryu_COMBO_800_D1_SA0.json",
+        "Ryu_COMBO_800_D1_SA0_20260527_025445.json",
+        "Ryu_COMBO_900_D0_SA0.json",
+        "Ryu_OKI_2000_D1_SA0.json",
+        "Ryu_OKI_2610_D0_SA0.json",
+        "Ryu_OKI_2790_D0_SA0.json",
+        "Ryu_OKI_3289_D3_SA1.json",
+        "Ryu_OKI_3510_D2_SA0.json",
+        "Ryu_OKI_3660_D0_SA0.json",
+        "Ryu_OKI_3930_D2_SA1.json",
+        "Ryu_OKI_5831_D6_SA2.5.json"
+    ],
+    "files": [
+        "RYURYU.json",
+        "Ryu Sheldon Recordings.json",
+        "Ryu Start Replay.json",
+        "Ryu Test Wael.json",
+        "Ryu.json",
+        "Ryu_Base.json",
+        "Ryu_FB_Training.json",
+        "Ryu_Text_Test.json",
+        "Ryu_XERNADRILLS.json",
+        "Ryu_XernaWithText.json"
+    ],
+    "selected_file": "Ryu_XernaWithText.json",
+    "slots": [
+        {
+            "active": false,
+            "frames": 18,
+            "name": "Walk Forward",
+            "valid": true,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 18,
+            "name": "Walk Backward",
+            "valid": true,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 25,
+            "name": "Walk Crouch Forward",
+            "valid": true,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 25,
+            "name": "Walk Crouch Backward",
+            "valid": true,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 1,
+            "name": "Low Medium Kick",
+            "valid": true,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 0,
+            "name": "",
+            "valid": false,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 0,
+            "name": "",
+            "valid": false,
+            "weight": 1
+        },
+        {
+            "active": false,
+            "frames": 0,
+            "name": "",
+            "valid": false,
+            "weight": 1
+        }
+    ],
+    "status_msg": "Loaded: Ryu_XernaWithText.json"
+}

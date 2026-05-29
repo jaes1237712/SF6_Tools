@@ -1,0 +1,101 @@
+[
+    {
+        "empty": false,
+        "id": 1,
+        "name": "FWD > Back",
+        "timeline": [
+            "25f : 4",
+            "31f : 6",
+            "3f : 5"
+        ],
+        "weight": 3
+    },
+    {
+        "empty": false,
+        "id": 2,
+        "name": "FWD > Jump HP",
+        "timeline": [
+            "20f : 4",
+            "6f : 7",
+            "2f : 8",
+            "21f : 5",
+            "10f : 5 + HP"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": false,
+        "id": 3,
+        "name": "FWD > Crouch MK",
+        "timeline": [
+            "28f : 4",
+            "2f : 1",
+            "7f : 2 + MK",
+            "2f : 2"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": false,
+        "id": 4,
+        "name": "FWD > Drive Impact",
+        "timeline": [
+            "26f : 4",
+            "2f : 4 + HP + HK"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": false,
+        "id": 5,
+        "name": "Slight FWD > Neutral Jump",
+        "timeline": [
+            "13f : 4",
+            "1f : 5",
+            "7f : 8",
+            "38f : 5"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": false,
+        "id": 6,
+        "name": "DR > MP",
+        "timeline": [
+            "27f : 4",
+            "31f : 6",
+            "2f : 5",
+            "3f : 4",
+            "4f : 5",
+            "4f : 4 + MP + MK",
+            "3f : 5",
+            "4f : 4",
+            "14f : 5",
+            "5f : 5 + MP"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": false,
+        "id": 7,
+        "name": "DR > LP",
+        "timeline": [
+            "16f : 4",
+            "5f : 5",
+            "2f : 4",
+            "2f : 4 + MP + MK",
+            "2f : 5 + MP + MK",
+            "8f : 4 + MP + MK",
+            "5f : 4",
+            "5f : 5",
+            "6f : 5 + LP"
+        ],
+        "weight": 1
+    },
+    {
+        "empty": true,
+        "id": 8,
+        "timeline": null,
+        "weight": 1
+    }
+]
