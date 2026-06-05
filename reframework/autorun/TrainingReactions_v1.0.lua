@@ -85,7 +85,8 @@ local user_config = {
     slot_visibility = { true, true, true, true, true, true, true, true },
     
     playback_mode_auto = true,
-    show_floating = true
+    show_floating = true,
+    auto_reset_delay = 0.1
 }
 
 -- =========================================================
@@ -210,7 +211,14 @@ local session = {
     time_up_delay = 0,
     
     -- [NEW] Track P1 Actions
-    last_act_id = -1
+    last_act_id = -1,
+
+    -- Parry detection
+    _p2_was_parried = false,
+    _p2_was_di = false,
+
+    -- Auto-reset after result
+    auto_reset_timer = -1
 }
 for i=1,8 do session.slot_stats[i] = { attempts=0, success=0 } end
 
@@ -268,6 +276,27 @@ local function input_int_keyboard(label, value)
 end
 
 
+
+local function get_p1_extended_info()
+    local info = { damage_type = 0, trade_dm_flag = false, muteki_time = 0 }
+    local gBattle = sdk.find_type_definition("gBattle")
+    if not gBattle then return info end
+    local player_mgr = gBattle:get_field("Player"):get_data(nil)
+    if not player_mgr then return info end
+    local p1 = player_mgr:call("getPlayer", 0)
+    if not p1 then return info end
+
+    local dt = p1:get_field("damage_type")
+    if dt then info.damage_type = tonumber(tostring(dt)) or 0 end
+
+    local trade = p1:get_field("trade_dm_flag")
+    if trade then info.trade_dm_flag = (tostring(trade) == "true") end
+
+    local mt = p1:get_field("muteki_time")
+    if mt then info.muteki_time = tonumber(tostring(mt)) or 0 end
+
+    return info
+end
 
 -- [FIXED] GET P1 ACTION ID (via Engine)
 local function get_p1_action_id()
@@ -535,10 +564,26 @@ local function update_logic()
 
     if session.feedback.timer > 0 then
         session.feedback.timer = session.feedback.timer - dt
-        if session.feedback.timer <= 0 then 
-            if not session.is_tracking then 
-                session.feedback.text = TEXTS.waiting; session.feedback.color = COLORS.Grey 
-            end 
+        if session.feedback.timer <= 0 then
+            if not session.is_tracking then
+                session.feedback.text = TEXTS.waiting; session.feedback.color = COLORS.Grey
+            end
+        end
+    end
+
+    -- Auto-reset after result
+    if session.auto_reset_timer > 0 then
+        session.auto_reset_timer = session.auto_reset_timer - dt
+        if session.auto_reset_timer <= 0 then
+            session.auto_reset_timer = -1
+            pcall(function()
+                local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+                if tm then tm:call("set_IsReqRefresh", true) end
+            end)
+            session.is_tracking = false
+            session.score_processed = false
+            session._p2_was_parried = false
+            session._p2_was_di = false
         end
     end
 
@@ -595,7 +640,18 @@ local function update_logic()
     session.p1_state = session.p1_max_frame
     session.p2_state = session.p2_max_frame
     local p2_ended = session.p2_is_end_flag
-    
+
+    local p1_mem = get_p1_extended_info()
+    if session._p2_was_di then
+        if p1_mem.muteki_time > 0 then
+            session._p2_was_parried = true
+        end
+    else
+        if p1_mem.damage_type == 34 and p1_mem.trade_dm_flag then
+            session._p2_was_parried = true
+        end
+    end
+
     session.p1_max_frame = 0 
     session.p2_max_frame = 0
     session.p2_is_end_flag = false 
@@ -619,8 +675,9 @@ local function update_logic()
                  set_feedback("FAIL: UNSAFE DR CANCEL", COLORS.Red, 2.0)
                  session.score = session.score - 1
                  session.total = session.total + 1
-                 update_slot_stats(false) 
+                 update_slot_stats(false)
                  session.score_processed = true
+                 if user_config.auto_reset_delay > 0 then session.auto_reset_timer = user_config.auto_reset_delay end
              end
         end
     end
@@ -634,31 +691,46 @@ local function update_logic()
                 set_feedback(TEXTS.attack_inc, COLORS.Yellow, 0)
                 session.di_counter_success = false
                 session.score_processed = false
+                session._p2_was_parried = false
+                session._p2_was_di = false
             end
         end
     else
         session.track_timer = session.track_timer + 1
 
+        if p2 == STATE_DI then session._p2_was_di = true end
+
         if not session.score_processed then
-            if p2 == STATE_HURT then
+            if session._p2_was_parried then
+                 set_feedback("SUCCESS: PERFECT PARRY!", COLORS.Green, 2.0)
+                 session.score = session.score + 1
+                 session.success = session.success + 1
+                 session.total = session.total + 1
+                 update_slot_stats(true)
+                 session.score_processed = true
+                 if user_config.auto_reset_delay > 0 then session.auto_reset_timer = user_config.auto_reset_delay end
+            elseif p2 == STATE_HURT then
                  set_feedback(TEXTS.success, COLORS.Green, 2.0)
                  session.score = session.score + 1
                  session.success = session.success + 1
                  session.total = session.total + 1
-                 update_slot_stats(true) 
+                 update_slot_stats(true)
                  session.score_processed = true
+                 if user_config.auto_reset_delay > 0 then session.auto_reset_timer = user_config.auto_reset_delay end
             elseif p1 == STATE_HURT then
                 set_feedback(TEXTS.fail_hit, COLORS.Red, 2.0)
                 session.score = session.score - 1
                 session.total = session.total + 1
-                update_slot_stats(false) 
+                update_slot_stats(false)
                 session.score_processed = true
+                if user_config.auto_reset_delay > 0 then session.auto_reset_timer = user_config.auto_reset_delay end
             elseif p1 == STATE_BLOCK then
                 set_feedback(TEXTS.fail_block, COLORS.Red, 2.0)
                 session.score = session.score - 1
                 session.total = session.total + 1
-                update_slot_stats(false) 
+                update_slot_stats(false)
                 session.score_processed = true
+                if user_config.auto_reset_delay > 0 then session.auto_reset_timer = user_config.auto_reset_delay end
             elseif p2 == STATE_DI and p1 == STATE_DI then
                 set_feedback("DI COUNTER!", COLORS.Green, 2.0)
                 session.di_counter_success = true
@@ -676,8 +748,9 @@ local function update_logic()
                         set_feedback(TEXTS.fail_whiff, COLORS.Red, 2.0)
                         session.score = session.score - 1
                         session.total = session.total + 1
-                        update_slot_stats(false) 
+                        update_slot_stats(false)
                         session.score_processed = true
+                        if user_config.auto_reset_delay > 0 then session.auto_reset_timer = user_config.auto_reset_delay end
                     end
                 end
             else
@@ -1138,6 +1211,20 @@ re.on_draw_ui(function()
             
             imgui.separator()
             local c_st, v_st = imgui.checkbox("Show Slot Percentages on HUD", user_config.show_slot_stats); if c_st then user_config.show_slot_stats = v_st; save_conf() end
+
+            imgui.separator()
+            imgui.text_colored("AUTO-RESET AFTER RESULT", COLORS.Cyan)
+            local delay_str = tostring(user_config.auto_reset_delay)
+            local c_delay, n_delay = imgui.input_text("Delay (seconds, -1 = off)", delay_str)
+            if c_delay then
+                local val = tonumber(n_delay)
+                if val then user_config.auto_reset_delay = val; save_conf() end
+            end
+            if user_config.auto_reset_delay > 0 then
+                imgui.text_colored("Reset position " .. user_config.auto_reset_delay .. "s after each result", COLORS.Green)
+            else
+                imgui.text_colored("Disabled", COLORS.DarkGrey)
+            end
         end
         
         if styled_header("--- UI LAYOUT ADJUSTMENTS ---", UI_THEME.hdr_layout) then

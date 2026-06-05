@@ -1,19 +1,34 @@
 {
   "vr_visible": true,
-  "_web_timestamp": 1780061357.4427364,
+  "_web_timestamp": 1780524500.3654354,
   "hud_text_visible": true,
   "p1": {
     "hitboxes": true,
     "hurtboxes": true,
-    "throwboxes": true,
-    "charge_bars": true,
-    "hud_pos": true,
+    "throwboxes": false,
+    "charge_bars": false,
+    "hud_pos": false,
     "hud_hp": true,
     "hud_sa": true,
     "hud_dr": true,
     "position_dot": true,
-    "hide_all": false
+    "hide_all": false,
+    "pushboxes": false,
+    "throwhurtboxes": false,
+    "proximityboxes": false,
+    "clashbox": false,
+    "uniqueboxes": false
   },
   "boxes_visible": true,
-  "charge_visible": true
+  "charge_visible": true,
+  "p2": {
+    "pushboxes": false,
+    "throwboxes": false,
+    "throwhurtboxes": false,
+    "clashbox": false,
+    "proximityboxes": false,
+    "uniqueboxes": false,
+    "charge_bars": false,
+    "hud_pos": false
+  }
 }

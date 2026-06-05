@@ -65,7 +65,8 @@ local auto_activate = {
     p2_mask = 0,
     cooldown = 0,
     cooldown_frames = 4,
-    delay_frames = 0,
+    delay_min = 0,
+    delay_max = 0,
     delay_counter = 0,
     tracked_action_id = -1,
     dbg_action_id = -1,
@@ -74,12 +75,17 @@ local auto_activate = {
     dbg_total = -1,
     was_in_range = false,
     footwork_enabled = false,
-    footwork_fw = 30,
-    footwork_bw = 30,
-    footwork_random = false,
+    footwork_fw = 10,
+    footwork_bw = 10,
+    footwork_cr = 5,
+    footwork_cr_min = 5,
+    footwork_cr_max = 15,
+    footwork_mode = "manual",
     footwork_dir = 4,
+    footwork_last_dir = 0,
     footwork_counter = 0,
     footwork_cur_limit = 0,
+    footwork_neutral = 0,
     reset_grace = 0,
 }
 local AA_COLOR_RED = 0xFF0000FF
@@ -265,7 +271,8 @@ local config = {
     window_pos_x = 20.0, window_pos_y = 20.0,
     p1_tree_open = false, p2_tree_open = false,
     adv_show_line_labels = true,
-    aa_delay_frames = 0,
+    aa_delay_min = 0,
+    aa_delay_max = 0,
     aa_delay_cancel = true
 }
 
@@ -319,7 +326,8 @@ local function load_settings()
     end 
 end
 load_settings()
-auto_activate.delay_frames = config.aa_delay_frames or 0
+auto_activate.delay_min = config.aa_delay_min or config.aa_delay_frames or 0
+auto_activate.delay_max = config.aa_delay_max or config.aa_delay_frames or 0
 
 -- =========================================================
 -- [WEB BRIDGE] — Poll for external config changes
@@ -373,9 +381,13 @@ local function poll_web_bridge()
             end
             -- Auto-activate changes
             if bridge._aa then
-                if bridge._aa.delay_frames ~= nil then
-                    auto_activate.delay_frames = bridge._aa.delay_frames
-                    config.aa_delay_frames = bridge._aa.delay_frames
+                if bridge._aa.delay_min ~= nil then
+                    auto_activate.delay_min = bridge._aa.delay_min
+                    config.aa_delay_min = bridge._aa.delay_min
+                end
+                if bridge._aa.delay_max ~= nil then
+                    auto_activate.delay_max = bridge._aa.delay_max
+                    config.aa_delay_max = bridge._aa.delay_max
                 end
                 if bridge._aa.enabled ~= nil then
                     auto_activate.enabled = bridge._aa.enabled
@@ -419,7 +431,14 @@ local function poll_web_bridge()
                 end
                 if bridge._aa.fw ~= nil then auto_activate.footwork_fw = bridge._aa.fw end
                 if bridge._aa.bw ~= nil then auto_activate.footwork_bw = bridge._aa.bw end
-                if bridge._aa.fw_random ~= nil then auto_activate.footwork_random = bridge._aa.fw_random; auto_activate.footwork_cur_limit = 0 end
+                if bridge._aa.fw_random ~= nil then
+                    if bridge._aa.fw_random then auto_activate.footwork_mode = "random" else auto_activate.footwork_mode = "manual" end
+                    auto_activate.footwork_cur_limit = 0
+                end
+                if bridge._aa.fw_mode ~= nil then auto_activate.footwork_mode = bridge._aa.fw_mode; auto_activate.footwork_cur_limit = 0 end
+                if bridge._aa.fw_cr ~= nil then auto_activate.footwork_cr = bridge._aa.fw_cr end
+                if bridge._aa.fw_cr_min ~= nil then auto_activate.footwork_cr_min = bridge._aa.fw_cr_min end
+                if bridge._aa.fw_cr_max ~= nil then auto_activate.footwork_cr_max = bridge._aa.fw_cr_max end
             end
             save_settings()
         end
@@ -2284,7 +2303,7 @@ local function draw_config_ui()
     -- ==========================================
     if styled_header("--- HELP & INFO ---", UI_THEME.hdr_info) then
         imgui.text("SHORTCUTS (Keyboard / Gamepad):")
-        
+
         if not config.expert_mode_enabled then
             imgui.text("- [5] or (Func) + LB/L1 : Toggle P1 (Normal / OFF)")
             imgui.text("- [6] or (Func) + RB/R1 : Toggle P2 (Normal / OFF)")
@@ -2292,9 +2311,9 @@ local function draw_config_ui()
             imgui.text("- [5] or (Func) + LB/L1 : Toggle P1 (ON / OFF)")
             imgui.text("- [6] or (Func) + RB/R1 : Toggle P2 (ON / OFF)")
         end
-        
+
         imgui.text("- [7] or (Func) + Triangle/Y : Toggle UI Window")
-        
+
         if _G.TrainingFuncButton ~= nil then
             imgui.text_colored("* (Func) button is defined in Training Script Manager (Default: Select)", COL_GREY)
         else
@@ -2309,17 +2328,26 @@ local function draw_config_ui()
                     if config.func_button == 8192 then btn_name = "R3 / RS" end
                     if config.func_button == 4096 then btn_name = "L3 / LS" end
                 end
-                
+
                 imgui.text("Current Func Button: " .. btn_name)
                 imgui.same_line()
                 if imgui.button("CHANGE FUNC BUTTON") then
                     is_binding_mode = true
-                    last_input_mask = 0 
+                    last_input_mask = 0
                 end
             end
         end
         imgui.spacing()
-    end -- Fin du bloc "HELP & INFO"
+        imgui.separator()
+        imgui.text_colored("AUTO ACTIVATE", 0xFF00FFFF)
+        imgui.text("  MAIN (M): Sets the trigger move and its range.")
+        imgui.text("  SUB (S): Additional moves picked randomly when firing.")
+        imgui.text("  WEIGHT (W): Selection probability per SUB move (0-10).")
+        imgui.text("  Delay: Frames to wait before firing. Delay Cancel aborts if out of range.")
+        imgui.text("  Footwork: Dummy walks FW/BW between attacks. Random randomizes duration.")
+        imgui.text("  Re-arms automatically after battle reset.")
+        imgui.spacing()
+    end -- end HELP & INFO
 
         -- ==========================================
         -- PLAYER OPTIONS (Normal Mode)
@@ -2655,17 +2683,17 @@ local function draw_config_ui()
         end
 
 
-        if imgui.button("-##aa_delay") then
-            auto_activate.delay_frames = math.max(0, auto_activate.delay_frames - 1)
-            config.aa_delay_frames = auto_activate.delay_frames; save_settings()
-        end
+        imgui.text("REACTION DELAY")
         imgui.same_line()
-        imgui.text("Delay: " .. auto_activate.delay_frames .. "f")
+        imgui.push_item_width(40)
+        local dmc, dmv = imgui.input_text("MIN##aa_delay", tostring(auto_activate.delay_min), 4)
+        if dmc then local n = tonumber(dmv); if n and n >= -99 and n <= 999 then auto_activate.delay_min = math.floor(n); config.aa_delay_min = auto_activate.delay_min; save_settings() end end
+        imgui.pop_item_width()
         imgui.same_line()
-        if imgui.button("+##aa_delay") then
-            auto_activate.delay_frames = auto_activate.delay_frames + 1
-            config.aa_delay_frames = auto_activate.delay_frames; save_settings()
-        end
+        imgui.push_item_width(40)
+        local dxc, dxv = imgui.input_text("MAX##aa_delay", tostring(auto_activate.delay_max), 4)
+        if dxc then local n = tonumber(dxv); if n and n >= -99 and n <= 999 then auto_activate.delay_max = math.floor(n); config.aa_delay_max = auto_activate.delay_max; save_settings() end end
+        imgui.pop_item_width()
 
         local dc_changed, dc_val = imgui.checkbox("Delay Cancel", config.aa_delay_cancel)
         if dc_changed then config.aa_delay_cancel = dc_val; save_settings() end
@@ -2676,20 +2704,58 @@ local function draw_config_ui()
             if not fw_val then auto_activate.p2_mask = 0; auto_activate.footwork_counter = 0; auto_activate.footwork_cur_limit = 0 end
         end
         imgui.same_line()
-        local rc, rv = imgui.checkbox("Random##fwrand", auto_activate.footwork_random)
-        if rc then auto_activate.footwork_random = rv; auto_activate.footwork_cur_limit = 0 end
-        imgui.same_line()
-        local label1 = auto_activate.footwork_random and "MIN##fw" or "FW##fw"
-        local label2 = auto_activate.footwork_random and "MAX##bw" or "BW##bw"
-        imgui.push_item_width(40)
-        local fwc, fwv = imgui.input_text(label1, tostring(auto_activate.footwork_fw), 4)
-        if fwc then local n = tonumber(fwv); if n and n >= 0 and n <= 999 then auto_activate.footwork_fw = math.floor(n) end end
-        imgui.pop_item_width()
-        imgui.same_line()
-        imgui.push_item_width(40)
-        local bwc, bwv = imgui.input_text(label2, tostring(auto_activate.footwork_bw), 4)
-        if bwc then local n = tonumber(bwv); if n and n >= 0 and n <= 999 then auto_activate.footwork_bw = math.floor(n) end end
-        imgui.pop_item_width()
+        local fw_modes = {"manual", "random"} -- TODO: add "ai" back
+        local fw_mode_labels = {manual="Manual", random="Random", ai="AI"}
+        local cur_mode = auto_activate.footwork_mode or "manual"
+        if imgui.button(fw_mode_labels[cur_mode] .. "##fwmode") then
+            for i, m in ipairs(fw_modes) do
+                if m == cur_mode then
+                    auto_activate.footwork_mode = fw_modes[(i % #fw_modes) + 1]
+                    auto_activate.footwork_cur_limit = 0
+                    break
+                end
+            end
+        end
+        local is_rand = cur_mode == "random"
+        if is_rand then
+            imgui.push_item_width(40)
+            local fwc, fwv = imgui.input_text("MIN##fw", tostring(auto_activate.footwork_fw), 4)
+            if fwc then local n = tonumber(fwv); if n and n >= 0 and n <= 999 then auto_activate.footwork_fw = math.floor(n) end end
+            imgui.pop_item_width()
+            imgui.same_line()
+            imgui.push_item_width(40)
+            local bwc, bwv = imgui.input_text("MAX##fw_bw", tostring(auto_activate.footwork_bw), 4)
+            if bwc then local n = tonumber(bwv); if n and n >= 0 and n <= 999 then auto_activate.footwork_bw = math.floor(n) end end
+            imgui.pop_item_width()
+            imgui.same_line()
+            imgui.text("FW/BW")
+            imgui.push_item_width(40)
+            local cmc, cmv = imgui.input_text("MIN##cr", tostring(auto_activate.footwork_cr_min), 4)
+            if cmc then local n = tonumber(cmv); if n and n >= 0 and n <= 999 then auto_activate.footwork_cr_min = math.floor(n) end end
+            imgui.pop_item_width()
+            imgui.same_line()
+            imgui.push_item_width(40)
+            local cxc, cxv = imgui.input_text("MAX##cr", tostring(auto_activate.footwork_cr_max), 4)
+            if cxc then local n = tonumber(cxv); if n and n >= 0 and n <= 999 then auto_activate.footwork_cr_max = math.floor(n) end end
+            imgui.pop_item_width()
+            imgui.same_line()
+            imgui.text("Crouch")
+        else
+            imgui.push_item_width(40)
+            local fwc, fwv = imgui.input_text("FW##fw", tostring(auto_activate.footwork_fw), 4)
+            if fwc then local n = tonumber(fwv); if n and n >= 0 and n <= 999 then auto_activate.footwork_fw = math.floor(n) end end
+            imgui.pop_item_width()
+            imgui.same_line()
+            imgui.push_item_width(40)
+            local bwc, bwv = imgui.input_text("BW##fw", tostring(auto_activate.footwork_bw), 4)
+            if bwc then local n = tonumber(bwv); if n and n >= 0 and n <= 999 then auto_activate.footwork_bw = math.floor(n) end end
+            imgui.pop_item_width()
+            imgui.same_line()
+            imgui.push_item_width(40)
+            local crc, crv = imgui.input_text("CR##fw", tostring(auto_activate.footwork_cr), 4)
+            if crc then local n = tonumber(crv); if n and n >= 0 and n <= 999 then auto_activate.footwork_cr = math.floor(n) end end
+            imgui.pop_item_width()
+        end
 
         if #all_moves > 0 then
             imgui.spacing()
@@ -2873,30 +2939,19 @@ local function aa_has_any_move()
 end
 
 local function aa_best_range()
-    local best = -1
-    local is_jump = false
-    if auto_activate.move then
-        if auto_activate.move.is_jump then
-            best = auto_activate.move.ar
-            is_jump = true
-        else
-            best = get_effective_ar(auto_activate.move, 1)
-        end
+    if not auto_activate.move then return -1, false end
+    if auto_activate.move.is_jump then
+        return auto_activate.move.ar, true
     end
-    for _, entry in pairs(auto_activate.sub_moves) do
-        if entry.weight > 0 and entry.move then
-            if entry.move.is_jump then
-                if entry.move.ar > best then best = entry.move.ar; is_jump = true end
-            else
-                local r = get_effective_ar(entry.move, 1)
-                if r > best then best = r; is_jump = false end
-            end
-        end
-    end
-    return best, is_jump
+    return get_effective_ar(auto_activate.move, 1), false
 end
 
 local function aa_tick()
+    if not _G.TrainingModeActive or _G.IsInReplay or _G.FlowMapID == 10 then
+        auto_activate.p2_mask = 0
+        return
+    end
+
     if auto_activate.cooldown > 0 then auto_activate.cooldown = auto_activate.cooldown - 1 end
 
     if auto_activate.reset_grace > 0 then
@@ -2907,32 +2962,81 @@ local function aa_tick()
     end
 
     if auto_activate.footwork_enabled and not auto_activate.is_firing and not auto_activate.waiting_neutral then
-        if auto_activate.footwork_cur_limit == 0 then
-            if auto_activate.footwork_random then
-                local mn = math.min(auto_activate.footwork_fw, auto_activate.footwork_bw)
-                local mx = math.max(auto_activate.footwork_fw, auto_activate.footwork_bw)
-                if mx > 0 then
-                    auto_activate.footwork_cur_limit = mn + math.random(0, mx - mn)
-                    auto_activate.footwork_dir = math.random() < 0.5 and 4 or 8
-                end
-            else
-                auto_activate.footwork_cur_limit = auto_activate.footwork_dir == 4 and auto_activate.footwork_fw or auto_activate.footwork_bw
-            end
-        end
-        if auto_activate.footwork_cur_limit > 0 then
+        if auto_activate.footwork_neutral > 0 then
+            auto_activate.footwork_neutral = auto_activate.footwork_neutral - 1
+            auto_activate.p2_mask = 0
+        elseif auto_activate.footwork_cur_limit > 0 then
+            auto_activate.p2_mask = auto_activate.footwork_dir
             auto_activate.footwork_counter = auto_activate.footwork_counter + 1
             if auto_activate.footwork_counter >= auto_activate.footwork_cur_limit then
+                auto_activate.footwork_last_dir = auto_activate.footwork_dir
                 auto_activate.footwork_counter = 0
                 auto_activate.footwork_cur_limit = 0
-                if not auto_activate.footwork_random then
-                    auto_activate.footwork_dir = auto_activate.footwork_dir == 4 and 8 or 4
+                local fw_mode = auto_activate.footwork_mode
+                local has_cr = auto_activate.footwork_cr > 0
+                local prev_dir = auto_activate.footwork_last_dir
+                if fw_mode == "ai" then
+                    local best_ar = aa_best_range()
+                    local _, dist = get_closest_edge(1)
+                    if best_ar > 0 and dist then
+                        local in_r = dist <= best_ar + 0.0000001
+                        if has_cr and math.random() < 0.2 then
+                            auto_activate.footwork_dir = 2
+                            auto_activate.footwork_cur_limit = auto_activate.footwork_cr + math.random(0, math.floor(auto_activate.footwork_cr * 0.5))
+                        elseif in_r then
+                            auto_activate.footwork_dir = 8
+                            auto_activate.footwork_cur_limit = auto_activate.footwork_bw + math.random(0, math.floor(auto_activate.footwork_bw * 0.5))
+                        else
+                            auto_activate.footwork_dir = 4
+                            auto_activate.footwork_cur_limit = auto_activate.footwork_fw + math.random(0, math.floor(auto_activate.footwork_fw * 0.5))
+                        end
+                    end
+                elseif fw_mode == "random" then
+                    local mn = math.min(auto_activate.footwork_fw, auto_activate.footwork_bw)
+                    local mx = math.max(auto_activate.footwork_fw, auto_activate.footwork_bw)
+                    local cr_mn = math.min(auto_activate.footwork_cr_min, auto_activate.footwork_cr_max)
+                    local cr_mx = math.max(auto_activate.footwork_cr_min, auto_activate.footwork_cr_max)
+                    if mx > 0 or cr_mx > 0 then
+                        local dirs = {4, 8}
+                        if cr_mx > 0 then dirs[#dirs+1] = 2 end
+                        local candidates = {}
+                        for _, d in ipairs(dirs) do
+                            if d ~= auto_activate.footwork_last_dir then candidates[#candidates+1] = d end
+                        end
+                        if #candidates == 0 then candidates = dirs end
+                        auto_activate.footwork_dir = candidates[math.random(#candidates)]
+                        if auto_activate.footwork_dir == 2 then
+                            auto_activate.footwork_cur_limit = cr_mn + math.random(0, cr_mx - cr_mn)
+                        else
+                            auto_activate.footwork_cur_limit = mn + math.random(0, mx - mn)
+                        end
+                    end
+                else
+                    if auto_activate.footwork_dir == 4 then
+                        auto_activate.footwork_dir = 8
+                    elseif auto_activate.footwork_dir == 8 and has_cr then
+                        auto_activate.footwork_dir = 2
+                    else
+                        auto_activate.footwork_dir = 4
+                    end
+                    if auto_activate.footwork_dir == 2 then
+                        auto_activate.footwork_cur_limit = auto_activate.footwork_cr
+                    elseif auto_activate.footwork_dir == 4 then
+                        auto_activate.footwork_cur_limit = auto_activate.footwork_fw
+                    else
+                        auto_activate.footwork_cur_limit = auto_activate.footwork_bw
+                    end
+                end
+                if prev_dir ~= 0 and prev_dir ~= 2 and auto_activate.footwork_dir ~= 2 and prev_dir ~= auto_activate.footwork_dir then
+                    auto_activate.footwork_neutral = math.random(1, 3)
                 end
             end
-            auto_activate.p2_mask = auto_activate.footwork_dir
         else
-            auto_activate.footwork_counter = 0
-            auto_activate.footwork_cur_limit = 0
-            auto_activate.footwork_dir = auto_activate.footwork_dir == 4 and 8 or 4
+            local fw_mode = auto_activate.footwork_mode
+            local has_cr = auto_activate.footwork_cr > 0
+            auto_activate.footwork_dir = 4
+            auto_activate.footwork_cur_limit = auto_activate.footwork_fw
+            auto_activate.footwork_last_dir = 0
         end
     end
 
@@ -2977,21 +3081,35 @@ local function aa_tick()
     local best_ar, best_jump = aa_best_range()
     if best_ar < 0 then return end
 
+    local d_min = auto_activate.delay_min
+    local d_max = math.max(d_min, auto_activate.delay_max)
+    local effective_ar = best_ar
+    if d_min < 0 and not auto_activate._anticipation_roll then
+        auto_activate._anticipation_roll = d_min + math.random(0, d_max - d_min)
+    end
+    local roll = auto_activate._anticipation_roll
+    if roll and roll < 0 then
+        effective_ar = best_ar * (1 + math.abs(roll) * 0.04)
+    end
+
     local in_range = false
     if best_jump then
         local real_dist = math.abs(p1_cache.world_x - p2_cache.world_x) * 100
-        in_range = real_dist < best_ar
+        in_range = real_dist < effective_ar
     else
         local _, dist = get_closest_edge(1)
         if not dist then return end
-        in_range = dist <= best_ar + 0.0000001
+        in_range = dist <= effective_ar + 0.0000001
     end
 
     if in_range and not auto_activate.was_in_range and auto_activate.cooldown <= 0 then
-        if auto_activate.delay_frames <= 0 then
+        local delay = roll or (d_min + math.random(0, d_max - d_min))
+        if delay <= 0 then
             aa_start_fire()
+            auto_activate._anticipation_roll = nil
         else
-            auto_activate.delay_counter = auto_activate.delay_frames
+            auto_activate.delay_counter = delay
+            auto_activate._anticipation_roll = nil
         end
     end
 
@@ -3015,6 +3133,7 @@ local function aa_tick()
     if p1_act_st ~= 32 and p1_act_st ~= 35 then
         auto_activate.was_in_range = in_range
     end
+    if auto_activate.was_in_range and not in_range then auto_activate._anticipation_roll = nil end
     auto_activate.dbg_in_range = in_range
     auto_activate.dbg_p1_ft = p1_act_st
 end
@@ -3091,6 +3210,21 @@ local _dv_last_window_rect = nil -- saved from on_draw_ui, used next frame
    
 
 re.on_frame(function()
+    if p2_cache and p2_cache.valid and p2_cache.real_name then
+        local p2_name = p2_cache.real_name
+        if _G._dv_last_p2_char and _G._dv_last_p2_char ~= p2_name then
+            auto_activate.enabled = false
+            auto_activate.move = nil
+            auto_activate.move_idx = 1
+            auto_activate.sequence = {}
+            auto_activate.sub_moves = {}
+            auto_activate.was_in_range = false
+            auto_activate.footwork_counter = 0
+            auto_activate.p2_mask = 0
+            if auto_activate.is_firing then aa_stop_fire() end
+        end
+        _G._dv_last_p2_char = p2_name
+    end
     poll_web_bridge()
     if _G._dv_pending_mode_flags then
         local pmf = _G._dv_pending_mode_flags
@@ -3111,12 +3245,17 @@ re.on_frame(function()
                 p1_facing_right = not not (p1_cache and p1_cache.facing_right),
                 p2_facing_right = not not (p2_cache and p2_cache.facing_right),
                 aa_enabled = auto_activate.enabled,
-                aa_delay = auto_activate.delay_frames,
+                aa_delay_min = auto_activate.delay_min,
+                aa_delay_max = auto_activate.delay_max,
                 aa_delay_cancel = config.aa_delay_cancel,
                 aa_footwork = auto_activate.footwork_enabled,
                 aa_fw = auto_activate.footwork_fw,
                 aa_bw = auto_activate.footwork_bw,
-                aa_fw_random = auto_activate.footwork_random,
+                aa_fw_mode = auto_activate.footwork_mode,
+                aa_fw_cr = auto_activate.footwork_cr,
+                aa_fw_cr_min = auto_activate.footwork_cr_min,
+                aa_fw_cr_max = auto_activate.footwork_cr_max,
+                is_replay = (_G.IsInReplay == true) or (_G.FlowMapID == 10),
                 aa_move = auto_activate.move and auto_activate.move.input or "",
                 aa_moves = {},
                 aa_subs = {},
@@ -3155,19 +3294,6 @@ re.on_frame(function()
             if jf and jf.cross_up_st then am[#am + 1] = { input = "FORWARD JUMP", ar = jf.cross_up_st, is_jump = true } end
             _G._dv_aa_moves = am
         end)
-        local p2_name = p2_cache.real_name
-        if _G._dv_last_p2_char and _G._dv_last_p2_char ~= p2_name then
-            auto_activate.enabled = false
-            auto_activate.move = nil
-            auto_activate.move_idx = 1
-            auto_activate.sequence = {}
-            auto_activate.sub_moves = {}
-            auto_activate.was_in_range = false
-            auto_activate.footwork_counter = 0
-            auto_activate.p2_mask = 0
-            if auto_activate.is_firing then aa_stop_fire() end
-        end
-        _G._dv_last_p2_char = p2_name
     end
     if _G._dv_aa_pending_input and _G._dv_aa_moves then
         local target = _G._dv_aa_pending_input

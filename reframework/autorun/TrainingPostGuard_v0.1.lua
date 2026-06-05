@@ -110,6 +110,7 @@ local session = {
     p2_throw_tech_detected = false,  -- Flag: a-t-on vu un throw tech ?
     p2_was_in_parry = false,  -- Flag: P2 était en parry
     throw_in_progress = false,  -- Flag: une choppe est en cours
+    _p2_was_di = false,
     
     -- Time Up
     time_up_delay = 0,
@@ -148,22 +149,26 @@ local function get_act_st(player_index)
 end
 
 local function get_p1_extended_info()
-    local info = { catch_flag = false, trade_dm_flag = false } -- On ajoute le champ par défaut
+    local info = { catch_flag = false, trade_dm_flag = false, damage_type = 0, muteki_time = 0 }
     local gBattle = sdk.find_type_definition("gBattle")
     if not gBattle then return info end
     local player_mgr = gBattle:get_field("Player"):get_data(nil)
     if not player_mgr then return info end
-    local p1 = player_mgr:call("getPlayer", 0) 
+    local p1 = player_mgr:call("getPlayer", 0)
     if not p1 then return info end
-    
-    -- Lecture de catch_flag (true = en train de chopper)
+
     local catch = p1:get_field("catch_flag")
     if catch then info.catch_flag = (tostring(catch) == "true") end
-    
-    -- NOUVEAU : Lecture du trade_dm_flag
+
     local trade = p1:get_field("trade_dm_flag")
     if trade then info.trade_dm_flag = (tostring(trade) == "true") end
-    
+
+    local dt = p1:get_field("damage_type")
+    if dt then info.damage_type = tonumber(tostring(dt)) or 0 end
+
+    local mt = p1:get_field("muteki_time")
+    if mt then info.muteki_time = tonumber(tostring(mt)) or 0 end
+
     return info
 end
 
@@ -263,6 +268,7 @@ local function reset_round()
     session.p2_throw_tech_detected = false
     session.p2_was_in_parry = false
     session.throw_in_progress = false
+    session._p2_was_di = false
 end
 
 local function reset_round_silent()
@@ -405,10 +411,16 @@ local function update_logic()
         end
 
     elseif session.phase == PHASE_OBSERVATION then
-        
-		-- [PRIORITÉ ABSOLUE] CHECK DU TRADE
-        -- On le met ici pour qu'il passe AVANT le check "FAIL: GOT HIT"
-        if p1_mem.trade_dm_flag then
+
+        if session.p2_state == STATE_DI then session._p2_was_di = true end
+
+        local is_perfect_parry = false
+        if session._p2_was_di then
+            is_perfect_parry = p1_mem.muteki_time > 0
+        else
+            is_perfect_parry = p1_mem.damage_type == 34 and p1_mem.trade_dm_flag
+        end
+        if is_perfect_parry then
              evaluate_outcome(true, "SUCCESS: PERFECT PARRY!")
              return
         end

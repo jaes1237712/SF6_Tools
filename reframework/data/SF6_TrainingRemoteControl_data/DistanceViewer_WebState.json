@@ -1,11 +1,15 @@
 {
-    "aa_bw": 30,
-    "aa_delay": 5,
+    "aa_bw": 10,
     "aa_delay_cancel": false,
+    "aa_delay_max": 4,
+    "aa_delay_min": 0,
     "aa_enabled": false,
     "aa_footwork": false,
-    "aa_fw": 30,
-    "aa_fw_random": false,
+    "aa_fw": 10,
+    "aa_fw_cr": 5,
+    "aa_fw_cr_max": 15,
+    "aa_fw_cr_min": 5,
+    "aa_fw_mode": "manual",
     "aa_move": "",
     "aa_moves": [
         "6HK",
@@ -29,8 +33,9 @@
         "FORWARD JUMP"
     ],
     "aa_subs": null,
-    "p1_char": "Ingrid",
-    "p1_facing_right": false,
+    "is_replay": false,
+    "p1_char": "Ryu",
+    "p1_facing_right": true,
     "p1_prefs": {
         "A.K.I.": {
             "low": {
@@ -418,7 +423,7 @@
     },
     "p1_show_all": true,
     "p2_char": "Ryu",
-    "p2_facing_right": true,
+    "p2_facing_right": false,
     "p2_prefs": {
         "A.K.I.": {
             "low": {
@@ -653,6 +658,17 @@
             "red": {
                 "ar": 207.1046,
                 "input": "5HP"
+            },
+            "yellow_offset": 50
+        },
+        "Mai": {
+            "low": {
+                "ar": 170.293,
+                "input": "2HK"
+            },
+            "red": {
+                "ar": 197,
+                "input": "5HK"
             },
             "yellow_offset": 50
         },
