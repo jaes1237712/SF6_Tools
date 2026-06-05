@@ -31,8 +31,7 @@ The following `.lua` scripts go into `Street Fighter 6\reframework\autorun\`:
 **Analysis & Visualization Tools:**
 | Script | Description |
 | :--- | :--- |
-| `SF6_DistanceViewer.lua` | Real-time attack range visualization with zones, crossup indicators, and jump arcs |
-| `SF6_DistanceLogger.lua` | Records distance data during gameplay for offline analysis |
+| `SF6_DistanceViewer.lua` | Real-time attack range visualization with zones, crossup indicators, jump arcs, and footwork automation |
 | `SheldonsBoxes.lua` | Hitbox/hurtbox display with ruler and charge visualization |
 
 **Utilities:**
@@ -136,6 +135,7 @@ Practice reacting to specific enemy moves (Drive Impact, Jumps, Whiffs).
   - The script automatically sets the Dummy to **"Replay Recording"**.
   - It handles **Randomness** and **Playback** logic automatically.
 - **Visual Aid:** A large overlay shows the timer and your success rate in real-time.
+- **Auto-Reset:** Automatically resets position after parry/DI detection for uninterrupted drilling.
 
 ### 4. Post Guard Training (NEW)
 
@@ -144,6 +144,7 @@ Practice punishing the dummy after blocking its attacks.
 - The dummy attacks, you block, then **punish during its recovery**
 - Includes **Drive Impact reaction training** — react with your own DI or counter
 - Tracks your punish success rate and timing
+- **Auto-Reset:** Robust parry/DI detection with automatic position reset
 
 ### 5. Recording Slot Manager
 
@@ -168,6 +169,8 @@ Real-time visualization of attack ranges, opponent zones, crossup distances, and
 - **Expert Mode** — Per-move distance data with configurable thresholds
 - **Crossup Indicator** — Shows if a forward jump will cross up (standing/crouching)
 - **Jump Arc** — Visual trajectory display
+- **Auto-Activate (AA)** — Configurable delay range (min/max) with anticipation roll for realistic anti-air timing
+- **Footwork Automation** — Three modes: Manual, Random, AI — with crouch (CR) randomization, neutral pause logic, and smart direction selection
 - Works in **Training Mode and Online Matches**
 
 ### Sheldon's Boxes
@@ -177,10 +180,6 @@ Hitbox/hurtbox display with advanced features:
 - Hitbox and hurtbox visualization
 - Ruler overlay for distance measurement
 - Charge move visualization
-
-### Distance Logger
-
-Records distance data during gameplay sessions for offline analysis and zone configuration.
 
 ---
 
