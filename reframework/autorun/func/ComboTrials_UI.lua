@@ -1028,10 +1028,8 @@ re.on_frame(function()
     if show_trial_overlay and is_game_active then
         sf6_menu_state.active = true
 
-        -- Keep NeonBarQueue alive even when UI hidden (so D2D combo sequence stays visible)
         if _G._tsm_hide_ui then
-            if not _G.NeonBarQueue then _G.NeonBarQueue = {} end
-            table.insert(_G.NeonBarQueue, { x = 0, y = 0, w = 0, h = 0, src = "CT_hidden" })
+            _G.TrainingBarsDrawn = true
             return
         end
 
@@ -1076,9 +1074,17 @@ re.on_frame(function()
         local pos = imgui.get_window_pos()
         local size = imgui.get_window_size()
 
-        -- Add to neon border queue
-        if not _G.NeonBarQueue then _G.NeonBarQueue = {} end
-        table.insert(_G.NeonBarQueue, { x = pos.x, y = pos.y, w = size.x, h = size.y, src = "CT_UI" })
+        -- Draw neon border via ImGui draw list
+        local draw = imgui.get_window_draw_list()
+        if draw then
+            local SharedUI = require("func/Training_SharedUI")
+            local c = SharedUI.neon_colors
+            local function to_abgr(v) local a=(v>>24)&0xFF; local r=(v>>16)&0xFF; local g=(v>>8)&0xFF; local b=v&0xFF; return (a<<24)|(b<<16)|(g<<8)|r end
+            local mx, my, mw, mh = pos.x, pos.y, size.x, size.y
+            draw:add_rect_filled(Vector2f.new(mx, my), Vector2f.new(mx + mw, my + mh), to_abgr(c.bg))
+            draw:add_rect(Vector2f.new(mx, my), Vector2f.new(mx + mw, my + mh), to_abgr(c.border))
+        end
+        _G.TrainingBarsDrawn = true
 
         -- SAUVEGARDE BLOQUÉE PENDANT LE COOLDOWN (Empêche la corruption des coordonnées)
         if size.x > 0 and size.y > 0 and not is_resizing then

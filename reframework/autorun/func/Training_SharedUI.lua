@@ -427,24 +427,46 @@ function UI.end_floating_window_top()
     imgui.pop_style_color(4)
 end
 
--- Publish top bar rect + queue neon border
-function UI.draw_floating_bg_top()
-    local w = imgui.get_window_size()
-    local pos = imgui.get_window_pos()
-    _G.TrainingFloatingBarTop = { x = pos.x, y = pos.y, w = w.x, h = w.y, active = true }
-    UI.publish_rect(pos.x, pos.y, w.x, w.y)
-    if not _G.NeonBarQueue then _G.NeonBarQueue = {} end
-    table.insert(_G.NeonBarQueue, { x = pos.x, y = pos.y, w = w.x, h = w.y, src = "TOP" })
+UI.neon_colors = {
+    bg = 0xFC240080,
+    border = 0xFFEF51EF,
+}
+
+local function argb_to_abgr(c)
+    local a = (c >> 24) & 0xFF
+    local r = (c >> 16) & 0xFF
+    local g = (c >> 8) & 0xFF
+    local b = c & 0xFF
+    return (a << 24) | (b << 16) | (g << 8) | r
 end
 
--- Publish bottom bar rect + queue neon border
-function UI.draw_floating_bg()
-    local w = imgui.get_window_size()
+local function draw_neon_border_imgui()
+    local draw = imgui.get_window_draw_list()
+    if not draw then return end
     local pos = imgui.get_window_pos()
-    _G.TrainingFloatingBar = { x = pos.x, y = pos.y, w = w.x, h = w.y, active = true }
-    UI.publish_rect(pos.x, pos.y, w.x, w.y)
-    if not _G.NeonBarQueue then _G.NeonBarQueue = {} end
-    table.insert(_G.NeonBarQueue, { x = pos.x, y = pos.y, w = w.x, h = w.y, src = "BOT" })
+    local sz = imgui.get_window_size()
+    local mx, my, mw, mh = pos.x, pos.y, sz.x, sz.y
+    local c = UI.neon_colors
+    local bg = argb_to_abgr(c.bg)
+    local border = argb_to_abgr(c.border)
+    draw:add_rect_filled(Vector2f.new(mx, my), Vector2f.new(mx + mw, my + mh), bg)
+    draw:add_rect(Vector2f.new(mx, my), Vector2f.new(mx + mw, my + mh), border)
+end
+
+function UI.draw_floating_bg_top()
+    local sz = imgui.get_window_size()
+    local pos = imgui.get_window_pos()
+    UI.publish_rect(pos.x, pos.y, sz.x, sz.y)
+    draw_neon_border_imgui()
+    _G.TrainingBarsDrawn = true
+end
+
+function UI.draw_floating_bg()
+    local sz = imgui.get_window_size()
+    local pos = imgui.get_window_pos()
+    UI.publish_rect(pos.x, pos.y, sz.x, sz.y)
+    draw_neon_border_imgui()
+    _G.TrainingBarsDrawn = true
 end
 
 -- SF6 neon button (identical to styled_sf6_button in floating mode with sf6_btn_font)
@@ -461,28 +483,5 @@ function UI.sf6_button(label, colors, width)
     return clicked
 end
 
--- D2D neon borders — queue pattern (same as DistanceViewer d2d_queue)
--- on_frame populates _G.NeonBarQueue, D2D callback draws then CLEARS it
-if d2d and d2d.register then
-    d2d.register(function() end, function()
-        local queue = _G.NeonBarQueue
-        if queue then
-            local sw, sh = d2d.surface_size()
-            for _, r in ipairs(queue) do
-                local mx, my, mw, mh = r.x, r.y, r.w, r.h
-                d2d.fill_rect(mx, my, mw, mh, 0xFC110022)
-                d2d.fill_rect(mx, my, mw, mh, 0x88440088)
-                d2d.fill_rect(mx, my, mw, 2, 0xFFFF00FF)
-                d2d.fill_rect(mx, my + mh - 2, mw, 2, 0xFFFF00FF)
-                d2d.outline_rect(mx - 2, my - 2, mw + 4, mh + 4, 2, 0x889900FF)
-                d2d.outline_rect(mx, my, mw, mh, 1, 0xFFFFAAFF)
-            end
-        end
-        -- Publish whether bars were drawn this frame
-        _G.TrainingBarsDrawn = (queue ~= nil and #queue > 0)
-        -- CRITICAL: clear queue after drawing (same as DistanceViewer)
-        _G.NeonBarQueue = {}
-    end)
-end
 
 return UI

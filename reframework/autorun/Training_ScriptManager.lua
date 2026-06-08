@@ -72,10 +72,10 @@ local config = {
     func_button = nil, -- No default: must be set by user via CHANGE FUNCTION BUTTON
     switch_key = 0x30, -- Keyboard key for mode switch (default: '0' = VK 0x30)
     switch_modifiers = {}, -- Required modifiers (e.g. {0x11} for Ctrl)
-    btn_colors = { c1 = 0xFFFF0000, c2 = 0xFF00FF00, c3 = 0xFF0000FF, c4 = 0xFFDC00FF },
+    btn_colors = { c1 = 0xFFFF0000, c2 = 0xFF019D00, c3 = 0xFF0000FF, c4 = 0xFFDC00FF },
     btn_alphas = { c1 = 200, c2 = 200, c3 = 200, c4 = 200 },
     -- Top bar colors (ARGB)
-    top_colors = { switch = 0xFF0066FF, active = 0xFF01FF00, inactive = 0xFF666666 },
+    top_colors = { switch = 0xFF0066FF, active = 0xFF019D00, inactive = 0xFF666666 },
     top_alphas = { switch = 170, active = 170, inactive = 120 },
     hide_btn = { x_pct = 0.4625, y_pct = 0.05, w_pct = 0.075, h_pct = 0.075 },
 }
@@ -95,9 +95,9 @@ local function build_sc_color(argb, fill_alpha)
     local rgb = abgr & 0x00FFFFFF
     return {
         text   = abgr,
-        base   = ((fill_alpha & 0xFF) << 24) | rgb,
-        hover  = ((math.min(255, fill_alpha + 40) & 0xFF) << 24) | rgb,
-        active = ((math.min(255, fill_alpha + 80) & 0xFF) << 24) | rgb,
+        base   = (0xFF << 24) | rgb,
+        hover  = (0xFF << 24) | rgb,
+        active = (0xFF << 24) | rgb,
         border = 0xFFFFFFFF,
     }
 end
@@ -618,6 +618,7 @@ end)
 
 re.on_frame(function()
     SharedUI.clear_rects()
+    _G.TrainingBarsDrawn = false
 
     -- Mode change ticker
     local cur_mode = _G.CurrentTrainerMode or 0
@@ -640,11 +641,12 @@ re.on_frame(function()
     if not _G._tsm_hide_rect then _G._tsm_hide_rect = { x = 0, y = 0, w = 0, h = 0 } end
     pcall(function()
         local sw, sh = SharedUI.get_screen_size()
+        local lb_off = SharedUI.get_letterbox_offset()
         local hb = config.hide_btn
         _G._tsm_hide_rect.x = sw * hb.x_pct
-        _G._tsm_hide_rect.y = sh * hb.y_pct
+        _G._tsm_hide_rect.y = lb_off + (sh - lb_off * 2) * hb.y_pct
         _G._tsm_hide_rect.w = sw * hb.w_pct
-        _G._tsm_hide_rect.h = sh * hb.h_pct
+        _G._tsm_hide_rect.h = (sh - lb_off * 2) * hb.h_pct
     end)
     if not _G.IsInBattleHub and imgui.is_mouse_clicked(0) then
         local m = imgui.get_mouse()
@@ -660,8 +662,6 @@ re.on_frame(function()
     -- BattleHub : toujours désactivé
     if _G.IsInBattleHub then
         if _G.CurrentTrainerMode ~= 0 then _G.CurrentTrainerMode = 0 end
-        _G.TrainingFloatingBar = nil
-        _G.TrainingFloatingBarTop = nil
         _G.TrainingModeActive = false
         _G.TrainingGamePaused = true
         pcall(function() json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", { sf6_running = true, training_active = false, mode = 0 }) end)
@@ -702,8 +702,6 @@ re.on_frame(function()
         if _G.CurrentTrainerMode ~= 0 then
             _G.CurrentTrainerMode = 0
         end
-        _G.TrainingFloatingBar = nil
-        _G.TrainingFloatingBarTop = nil
         _G.TrainingModeActive = false
         _G.TrainingGamePaused = true
         pcall(function() json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", { sf6_running = true, training_active = false, mode = 0 }) end)
