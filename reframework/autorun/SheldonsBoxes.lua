@@ -610,16 +610,15 @@ local charge_p2_rect = { x = 0, y = 0, w = 0, h = 0 }
 local click_flash_frames = 0
 
 local function vr_get_vital_max(player_idx)
-    local ok, result = pcall(function()
-        local gb = sdk.find_type_definition("gBattle")
-        if not gb then return nil end
-        local sP = gb:get_field("Player"):get_data(nil)
-        if not sP or not sP.mcPlayer then return nil end
-        local p = sP.mcPlayer[player_idx]
-        if not p then return nil end
-        return p.vital_max
-    end)
-    if ok and result and result > 0 then return result end
+    if not gBattle then return nil end
+    local ok, sP = pcall(gBattle.get_field, gBattle, "Player")
+    if not ok or not sP then return nil end
+    local ok2, data = pcall(sP.get_data, sP, nil)
+    if not ok2 or not data or not data.mcPlayer then return nil end
+    local p = data.mcPlayer[player_idx]
+    if not p then return nil end
+    local v = p.vital_max
+    if v and v > 0 then return v end
     return nil
 end
 
@@ -758,10 +757,10 @@ re.on_frame(function()
         if sWork and sWork.Global_work then
             for i, obj in pairs(sWork.Global_work) do
                 if obj and obj.mpActParam and obj.pos and obj.pos.x and obj.pos.y then
-                   local is_dying = false; local success, result = pcall(function() return obj:get_IsR0Die() end); if success then is_dying = result end
+                   local is_dying = false; local success, result = pcall(obj.get_IsR0Die, obj); if success then is_dying = result end
                    if not is_dying then
                        local actParam = obj.mpActParam
-                       local is_team1 = false; local success_team, result_team = pcall(function() return obj:get_IsTeam1P() end); if success_team then is_team1 = result_team end
+                       local is_team1 = false; local success_team, result_team = pcall(obj.get_IsTeam1P, obj); if success_team then is_team1 = result_team end
                        if is_team1 and not hide_p1_boxes then draw_boxes(obj, actParam, true);
                             v_pos.x = obj.pos.x.v / 6553600.0; v_pos.y = obj.pos.y.v / 6553600.0; v_pos.z = 0
                             local objPos = draw.world_to_screen(v_pos); if objPos and display_p1_position_dot then draw.filled_circle(objPos.x, objPos.y + config.arrow_y_offset, 5, 0xFFFFFF00, 10) end
@@ -896,88 +895,86 @@ re.on_frame(function()
     _G._sb_web_counter = _G._sb_web_counter + 1
     if _G._sb_web_counter >= 60 then
         _G._sb_web_counter = 0
-        pcall(function()
-            json.dump_file("SF6_TrainingRemoteControl_data/SheldonsBoxes_WebState.json", {
-                vr_visible = vr_visible,
-                hud_text_visible = hud_text_visible,
-                boxes_visible = boxes_visible,
-                charge_visible = charge_visible,
-                p1 = {
-                    hitboxes = display_p1_hitboxes, hurtboxes = display_p1_hurtboxes,
-                    pushboxes = display_p1_pushboxes, throwboxes = display_p1_throwboxes,
-                    throwhurtboxes = display_p1_throwhurtboxes, proximityboxes = display_p1_proximityboxes,
-                    uniqueboxes = display_p1_uniqueboxes, clashbox = display_p1_clashbox,
-                    properties = display_p1_properties, position_dot = display_p1_position_dot,
-                    charge_bars = display_p1_charge_bars, hide_all = hide_p1_boxes,
-                    hud_pos = display_p1_hud_pos, hud_hp = display_p1_hud_hp,
-                    hud_dr = display_p1_hud_dr, hud_sa = display_p1_hud_sa,
-                },
-                p2 = {
-                    hitboxes = display_p2_hitboxes, hurtboxes = display_p2_hurtboxes,
-                    pushboxes = display_p2_pushboxes, throwboxes = display_p2_throwboxes,
-                    throwhurtboxes = display_p2_throwhurtboxes, proximityboxes = display_p2_proximityboxes,
-                    uniqueboxes = display_p2_uniqueboxes, clashbox = display_p2_clashbox,
-                    properties = display_p2_properties, position_dot = display_p2_position_dot,
-                    charge_bars = display_p2_charge_bars, hide_all = hide_p2_boxes,
-                    hud_pos = display_p2_hud_pos, hud_hp = display_p2_hud_hp,
-                    hud_dr = display_p2_hud_dr, hud_sa = display_p2_hud_sa,
-                },
-            })
-        end)
+        pcall(json.dump_file, "SF6_TrainingRemoteControl_data/SheldonsBoxes_WebState.json", {
+            vr_visible = vr_visible,
+            hud_text_visible = hud_text_visible,
+            boxes_visible = boxes_visible,
+            charge_visible = charge_visible,
+            p1 = {
+                hitboxes = display_p1_hitboxes, hurtboxes = display_p1_hurtboxes,
+                pushboxes = display_p1_pushboxes, throwboxes = display_p1_throwboxes,
+                throwhurtboxes = display_p1_throwhurtboxes, proximityboxes = display_p1_proximityboxes,
+                uniqueboxes = display_p1_uniqueboxes, clashbox = display_p1_clashbox,
+                properties = display_p1_properties, position_dot = display_p1_position_dot,
+                charge_bars = display_p1_charge_bars, hide_all = hide_p1_boxes,
+                hud_pos = display_p1_hud_pos, hud_hp = display_p1_hud_hp,
+                hud_dr = display_p1_hud_dr, hud_sa = display_p1_hud_sa,
+            },
+            p2 = {
+                hitboxes = display_p2_hitboxes, hurtboxes = display_p2_hurtboxes,
+                pushboxes = display_p2_pushboxes, throwboxes = display_p2_throwboxes,
+                throwhurtboxes = display_p2_throwhurtboxes, proximityboxes = display_p2_proximityboxes,
+                uniqueboxes = display_p2_uniqueboxes, clashbox = display_p2_clashbox,
+                properties = display_p2_properties, position_dot = display_p2_position_dot,
+                charge_bars = display_p2_charge_bars, hide_all = hide_p2_boxes,
+                hud_pos = display_p2_hud_pos, hud_hp = display_p2_hud_hp,
+                hud_dr = display_p2_hud_dr, hud_sa = display_p2_hud_sa,
+            },
+        })
     end
     -- Poll incoming changes
     if not _G._sb_bridge_ts then _G._sb_bridge_ts = 0 end
     if _G._sb_web_counter == 0 then
-        pcall(function()
-            local b = json.load_file("SF6_TrainingRemoteControl_data/SheldonsBoxes_WebBridge.json")
-            if not b then return end
+        local ok, b = pcall(json.load_file, "SF6_TrainingRemoteControl_data/SheldonsBoxes_WebBridge.json")
+        if ok and b then
             local ts = b._web_timestamp or 0
-            if ts <= _G._sb_bridge_ts then return end
-            _G._sb_bridge_ts = ts
-            if b.vr_visible ~= nil then vr_visible = b.vr_visible end
-            if b.hud_text_visible ~= nil then hud_text_visible = b.hud_text_visible end
-            if b.boxes_visible ~= nil then boxes_visible = b.boxes_visible end
-            if b.charge_visible ~= nil then charge_visible = b.charge_visible end
-            if b.p1 then
-                if b.p1.hitboxes ~= nil then display_p1_hitboxes = b.p1.hitboxes end
-                if b.p1.hurtboxes ~= nil then display_p1_hurtboxes = b.p1.hurtboxes end
-                if b.p1.pushboxes ~= nil then display_p1_pushboxes = b.p1.pushboxes end
-                if b.p1.throwboxes ~= nil then display_p1_throwboxes = b.p1.throwboxes end
-                if b.p1.throwhurtboxes ~= nil then display_p1_throwhurtboxes = b.p1.throwhurtboxes end
-                if b.p1.proximityboxes ~= nil then display_p1_proximityboxes = b.p1.proximityboxes end
-                if b.p1.uniqueboxes ~= nil then display_p1_uniqueboxes = b.p1.uniqueboxes end
-                if b.p1.clashbox ~= nil then display_p1_clashbox = b.p1.clashbox end
-                if b.p1.properties ~= nil then display_p1_properties = b.p1.properties end
-                if b.p1.position_dot ~= nil then display_p1_position_dot = b.p1.position_dot end
-                if b.p1.charge_bars ~= nil then display_p1_charge_bars = b.p1.charge_bars end
-                if b.p1.hide_all ~= nil then hide_p1_boxes = b.p1.hide_all end
-                if b.p1.hud_pos ~= nil then display_p1_hud_pos = b.p1.hud_pos end
-                if b.p1.hud_hp ~= nil then display_p1_hud_hp = b.p1.hud_hp end
-                if b.p1.hud_dr ~= nil then display_p1_hud_dr = b.p1.hud_dr end
-                if b.p1.hud_sa ~= nil then display_p1_hud_sa = b.p1.hud_sa end
+            if ts > _G._sb_bridge_ts then
+                _G._sb_bridge_ts = ts
+                if b.vr_visible ~= nil then vr_visible = b.vr_visible end
+                if b.hud_text_visible ~= nil then hud_text_visible = b.hud_text_visible end
+                if b.boxes_visible ~= nil then boxes_visible = b.boxes_visible end
+                if b.charge_visible ~= nil then charge_visible = b.charge_visible end
+                if b.p1 then
+                    if b.p1.hitboxes ~= nil then display_p1_hitboxes = b.p1.hitboxes end
+                    if b.p1.hurtboxes ~= nil then display_p1_hurtboxes = b.p1.hurtboxes end
+                    if b.p1.pushboxes ~= nil then display_p1_pushboxes = b.p1.pushboxes end
+                    if b.p1.throwboxes ~= nil then display_p1_throwboxes = b.p1.throwboxes end
+                    if b.p1.throwhurtboxes ~= nil then display_p1_throwhurtboxes = b.p1.throwhurtboxes end
+                    if b.p1.proximityboxes ~= nil then display_p1_proximityboxes = b.p1.proximityboxes end
+                    if b.p1.uniqueboxes ~= nil then display_p1_uniqueboxes = b.p1.uniqueboxes end
+                    if b.p1.clashbox ~= nil then display_p1_clashbox = b.p1.clashbox end
+                    if b.p1.properties ~= nil then display_p1_properties = b.p1.properties end
+                    if b.p1.position_dot ~= nil then display_p1_position_dot = b.p1.position_dot end
+                    if b.p1.charge_bars ~= nil then display_p1_charge_bars = b.p1.charge_bars end
+                    if b.p1.hide_all ~= nil then hide_p1_boxes = b.p1.hide_all end
+                    if b.p1.hud_pos ~= nil then display_p1_hud_pos = b.p1.hud_pos end
+                    if b.p1.hud_hp ~= nil then display_p1_hud_hp = b.p1.hud_hp end
+                    if b.p1.hud_dr ~= nil then display_p1_hud_dr = b.p1.hud_dr end
+                    if b.p1.hud_sa ~= nil then display_p1_hud_sa = b.p1.hud_sa end
+                end
+                if b.p2 then
+                    if b.p2.hitboxes ~= nil then display_p2_hitboxes = b.p2.hitboxes end
+                    if b.p2.hurtboxes ~= nil then display_p2_hurtboxes = b.p2.hurtboxes end
+                    if b.p2.pushboxes ~= nil then display_p2_pushboxes = b.p2.pushboxes end
+                    if b.p2.throwboxes ~= nil then display_p2_throwboxes = b.p2.throwboxes end
+                    if b.p2.throwhurtboxes ~= nil then display_p2_throwhurtboxes = b.p2.throwhurtboxes end
+                    if b.p2.proximityboxes ~= nil then display_p2_proximityboxes = b.p2.proximityboxes end
+                    if b.p2.uniqueboxes ~= nil then display_p2_uniqueboxes = b.p2.uniqueboxes end
+                    if b.p2.clashbox ~= nil then display_p2_clashbox = b.p2.clashbox end
+                    if b.p2.properties ~= nil then display_p2_properties = b.p2.properties end
+                    if b.p2.position_dot ~= nil then display_p2_position_dot = b.p2.position_dot end
+                    if b.p2.charge_bars ~= nil then display_p2_charge_bars = b.p2.charge_bars end
+                    if b.p2.hide_all ~= nil then hide_p2_boxes = b.p2.hide_all end
+                    if b.p2.hud_pos ~= nil then display_p2_hud_pos = b.p2.hud_pos end
+                    if b.p2.hud_hp ~= nil then display_p2_hud_hp = b.p2.hud_hp end
+                    if b.p2.hud_dr ~= nil then display_p2_hud_dr = b.p2.hud_dr end
+                    if b.p2.hud_sa ~= nil then display_p2_hud_sa = b.p2.hud_sa end
+                end
             end
-            if b.p2 then
-                if b.p2.hitboxes ~= nil then display_p2_hitboxes = b.p2.hitboxes end
-                if b.p2.hurtboxes ~= nil then display_p2_hurtboxes = b.p2.hurtboxes end
-                if b.p2.pushboxes ~= nil then display_p2_pushboxes = b.p2.pushboxes end
-                if b.p2.throwboxes ~= nil then display_p2_throwboxes = b.p2.throwboxes end
-                if b.p2.throwhurtboxes ~= nil then display_p2_throwhurtboxes = b.p2.throwhurtboxes end
-                if b.p2.proximityboxes ~= nil then display_p2_proximityboxes = b.p2.proximityboxes end
-                if b.p2.uniqueboxes ~= nil then display_p2_uniqueboxes = b.p2.uniqueboxes end
-                if b.p2.clashbox ~= nil then display_p2_clashbox = b.p2.clashbox end
-                if b.p2.properties ~= nil then display_p2_properties = b.p2.properties end
-                if b.p2.position_dot ~= nil then display_p2_position_dot = b.p2.position_dot end
-                if b.p2.charge_bars ~= nil then display_p2_charge_bars = b.p2.charge_bars end
-                if b.p2.hide_all ~= nil then hide_p2_boxes = b.p2.hide_all end
-                if b.p2.hud_pos ~= nil then display_p2_hud_pos = b.p2.hud_pos end
-                if b.p2.hud_hp ~= nil then display_p2_hud_hp = b.p2.hud_hp end
-                if b.p2.hud_dr ~= nil then display_p2_hud_dr = b.p2.hud_dr end
-                if b.p2.hud_sa ~= nil then display_p2_hud_sa = b.p2.hud_sa end
-            end
-        end)
+        end
     end
 
-    -- if not _G._gc_managed then collectgarbage("step", 1) end
+    -- collectgarbage("step", 10)
 end)
 
 -- =========================================================

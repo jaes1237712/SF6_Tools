@@ -19,25 +19,26 @@ if _td_mediator then
     if m then
         sdk.hook(m, function(args)
             _G._profiler_hook_ugi_start = os.clock()
-            pcall(function()
-                local mgr = sdk.to_managed_object(args[2])
-                if not mgr then return end
-                local pt = _f_playerType:get_data(mgr)
-                if not pt or pt:call("get_Length") < 2 then return end
-                for i = 0, 1 do
-                    local p = pt:call("GetValue", i)
-                    if p then
-                        local pid = p:get_type_definition():get_field("value__"):get_data(p)
-                        if pid then
-                            local k = string.format("ESF_%03d", pid)
-                            local name_str = p:call("ToString")
-                            _G._shared_player_info[i].id = pid
-                            _G._shared_player_info[i].key = k
-                            _G._shared_player_info[i].name = name_str
-                        end
+            local ok, mgr = pcall(sdk.to_managed_object, args[2])
+            if not ok or not mgr then _G._profiler_hook_ugi_end = os.clock(); return end
+            local ok2, pt = pcall(_f_playerType.get_data, _f_playerType, mgr)
+            if not ok2 or not pt then _G._profiler_hook_ugi_end = os.clock(); return end
+            local ok3, plen = pcall(pt.call, pt, "get_Length")
+            if not ok3 or not plen or plen < 2 then _G._profiler_hook_ugi_end = os.clock(); return end
+            for i = 0, 1 do
+                local ok4, p = pcall(pt.call, pt, "GetValue", i)
+                if ok4 and p then
+                    local ok5, pid = pcall(function()
+                        return p:get_type_definition():get_field("value__"):get_data(p)
+                    end)
+                    if ok5 and pid then
+                        _G._shared_player_info[i].id = pid
+                        _G._shared_player_info[i].key = string.format("ESF_%03d", pid)
+                        local ok6, ns = pcall(p.call, p, "ToString")
+                        _G._shared_player_info[i].name = (ok6 and ns) or "Unknown"
                     end
                 end
-            end)
+            end
             _G._profiler_hook_ugi_end = os.clock()
         end, function(retval) return retval end)
     end
@@ -51,6 +52,10 @@ _G._shared_input_pre = {}
 _G._shared_input_post = {}
 
 local p_id_stack = {}
+local _cached_sP = nil
+local _cached_addr = { [0] = nil, [1] = nil }
+local _addr_refresh = 0
+
 local cplayer_type = sdk.find_type_definition("nBattle.cPlayer")
 if cplayer_type then
     local method = cplayer_type:get_method("pl_input_sub")
@@ -60,15 +65,28 @@ if cplayer_type then
                 _G._profiler_hook_input_start = os.clock()
                 local hook_addr = sdk.to_int64(args[2])
                 local p_id = -1
-                pcall(function()
-                    if _td_gBattle then
-                        local sP = _td_gBattle:get_field("Player"):get_data(nil)
-                        if sP and sP.mcPlayer then
-                            if sP.mcPlayer[0] and sP.mcPlayer[0]:get_address() == hook_addr then p_id = 0 end
-                            if sP.mcPlayer[1] and sP.mcPlayer[1]:get_address() == hook_addr then p_id = 1 end
+
+                _addr_refresh = _addr_refresh + 1
+                if _addr_refresh >= 120 or not _cached_addr[0] then
+                    _addr_refresh = 0
+                    local ok, sP = pcall(function()
+                        if not _td_gBattle then return nil end
+                        return _td_gBattle:get_field("Player"):get_data(nil)
+                    end)
+                    if ok and sP and sP.mcPlayer then
+                        _cached_sP = sP
+                        for i = 0, 1 do
+                            if sP.mcPlayer[i] then
+                                local aok, addr = pcall(sP.mcPlayer[i].get_address, sP.mcPlayer[i])
+                                _cached_addr[i] = aok and addr or nil
+                            end
                         end
                     end
-                end)
+                end
+
+                if hook_addr == _cached_addr[0] then p_id = 0
+                elseif hook_addr == _cached_addr[1] then p_id = 1 end
+
                 table.insert(p_id_stack, p_id)
                 for _, cb in ipairs(_G._shared_input_pre) do
                     pcall(cb, p_id, args)
