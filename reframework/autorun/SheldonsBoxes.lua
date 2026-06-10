@@ -922,8 +922,11 @@ re.on_frame(function()
             },
         })
     end
-    -- Poll incoming changes
-    if not _G._sb_bridge_ts then _G._sb_bridge_ts = 0 end
+    -- Poll incoming changes (skip stale bridge data on first load)
+    if not _G._sb_bridge_ts then
+        local ok_init, b_init = pcall(json.load_file, "SF6_TrainingRemoteControl_data/SheldonsBoxes_WebBridge.json")
+        _G._sb_bridge_ts = (ok_init and b_init and b_init._web_timestamp) or 0
+    end
     if _G._sb_web_counter == 0 then
         local ok, b = pcall(json.load_file, "SF6_TrainingRemoteControl_data/SheldonsBoxes_WebBridge.json")
         if ok and b then

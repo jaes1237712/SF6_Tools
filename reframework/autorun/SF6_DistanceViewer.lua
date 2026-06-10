@@ -366,7 +366,7 @@ local function poll_web_bridge()
     _web_bridge_counter = 0
 
     -- Read incoming changes
-    local ok, bridge = pcall(function() return json.load_file(_web_bridge_file) end)
+    local ok, bridge = pcall(json.load_file, _web_bridge_file)
     if ok and bridge then
         local ts = bridge._web_timestamp or 0
         if ts > _web_bridge_last_ts then
@@ -827,14 +827,14 @@ local function get_sorted_thresholds(limits, show_title, show_name, prefix)
     return arr
 end
 
+local function _dv_get_disp_xy(r) return r.x, r.y end
 local function get_dynamic_screen_size()
-    local w, h = 1920, 1080 
+    local w, h = 1920, 1080
     if imgui.get_display_size then
         local result = imgui.get_display_size()
         if type(result) == "userdata" then
-            local ok, x = pcall(function() return result.x end)
-            local ok2, y = pcall(function() return result.y end)
-            if ok and ok2 then w = x; h = y 
+            local ok, x, y = pcall(_dv_get_disp_xy, result)
+            if ok then w = x; h = y
             elseif result.w and result.h then w = result.w; h = result.h end
         elseif type(result) == "number" then
             local w_val, h_val = imgui.get_display_size()
@@ -2336,13 +2336,14 @@ local function aa_start_fire()
     auto_activate.p2_mask = 0
 end
 
+local function _dv_fetch_p2_engine()
+    local gB = sdk.find_type_definition("gBattle")
+    local sP = gB:get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer then return nil end
+    return sP.mcPlayer[1].mpActParam.ActionPart._Engine
+end
 local function aa_get_p2_engine()
-    local ok, engine = pcall(function()
-        local gB = sdk.find_type_definition("gBattle")
-        local sP = gB:get_field("Player"):get_data(nil)
-        if not sP or not sP.mcPlayer then return nil end
-        return sP.mcPlayer[1].mpActParam.ActionPart._Engine
-    end)
+    local ok, engine = pcall(_dv_fetch_p2_engine)
     return ok and engine or nil
 end
 
@@ -2361,6 +2362,43 @@ local function aa_stop_fire()
     auto_activate.current_step = 1
     auto_activate.current_frame = 0
     auto_activate.p2_mask = 0
+end
+
+local function _dv_draw_live_box_dump()
+    local gB = sdk.find_type_definition("gBattle")
+    if not gB then return end
+    local sP = gB:get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer or not sP.mcPlayer[0] then return end
+    local p = sP.mcPlayer[0]
+    if not p.mpActParam or not p.mpActParam.Collision then return end
+    local col = p.mpActParam.Collision
+    if col.Infos and col.Infos._items then
+        for j, r in pairs(col.Infos._items) do
+            if r and r.OffsetX and r.OffsetX.v then
+                local has_HitPos = r:get_field("HitPos") ~= nil
+                local has_Attr = r:get_field("Attr") ~= nil
+                local has_HitNo = r:get_field("HitNo") ~= nil
+                local label = "?"
+                if has_HitPos then
+                    local tf = r.TypeFlag or 0
+                    local pb = r.PoseBit or 0
+                    local cf = r.CondFlag or 0
+                    local gb = r.GuardBit or 0
+                    if tf > 0 then label = "HITBOX"
+                    elseif (tf == 0 and pb > 0) or cf == 0x2C0 then label = "THROWBOX"
+                    elseif gb == 0 then label = "CLASH"
+                    else label = "PROXIMITY" end
+                elseif has_Attr then label = "PUSHBOX"
+                elseif has_HitNo then
+                    local tp = r.Type or 0
+                    if tp == 1 or tp == 2 then label = "HURTBOX_INV" else label = "HURTBOX" end
+                end
+                local ox = r.OffsetX.v / 6553600.0
+                local sx = r.SizeX.v / 6553600.0
+                imgui.text(string.format("  [%d] %-12s X:%.3f SX:%.3f", j, label, ox, sx))
+            end
+        end
+    end
 end
 
 local function draw_config_ui()
@@ -2676,42 +2714,7 @@ local function draw_config_ui()
 
         imgui.separator()
         imgui.text_colored("[LIVE BOX DUMP — P1]", COL_CYAN)
-        pcall(function()
-            local gB = sdk.find_type_definition("gBattle")
-            if not gB then return end
-            local sP = gB:get_field("Player"):get_data(nil)
-            if not sP or not sP.mcPlayer or not sP.mcPlayer[0] then return end
-            local p = sP.mcPlayer[0]
-            if not p.mpActParam or not p.mpActParam.Collision then return end
-            local col = p.mpActParam.Collision
-            if col.Infos and col.Infos._items then
-                for j, r in pairs(col.Infos._items) do
-                    if r and r.OffsetX and r.OffsetX.v then
-                        local has_HitPos = r:get_field("HitPos") ~= nil
-                        local has_Attr = r:get_field("Attr") ~= nil
-                        local has_HitNo = r:get_field("HitNo") ~= nil
-                        local label = "?"
-                        if has_HitPos then
-                            local tf = r.TypeFlag or 0
-                            local pb = r.PoseBit or 0
-                            local cf = r.CondFlag or 0
-                            local gb = r.GuardBit or 0
-                            if tf > 0 then label = "HITBOX"
-                            elseif (tf == 0 and pb > 0) or cf == 0x2C0 then label = "THROWBOX"
-                            elseif gb == 0 then label = "CLASH"
-                            else label = "PROXIMITY" end
-                        elseif has_Attr then label = "PUSHBOX"
-                        elseif has_HitNo then
-                            local tp = r.Type or 0
-                            if tp == 1 or tp == 2 then label = "HURTBOX_INV" else label = "HURTBOX" end
-                        end
-                        local ox = r.OffsetX.v / 6553600.0
-                        local sx = r.SizeX.v / 6553600.0
-                        imgui.text(string.format("  [%d] %-12s X:%.3f SX:%.3f", j, label, ox, sx))
-                    end
-                end
-            end
-        end)
+        pcall(_dv_draw_live_box_dump)
     end
     
     end -- FIN DU BLOC "if not config.simple_mode_enabled"
@@ -2933,10 +2936,10 @@ local function draw_config_ui()
             end
 
             imgui.end_child_window()
-            local dbg_col = auto_activate.dbg_in_range and 0xFF00FF00 or COL_RED
         else
             imgui.text_colored("No attack data for " .. p2_base, COL_GREY)
         end
+
 
     end
 end
@@ -2976,7 +2979,7 @@ local function get_hardware_pad_mask()
 end
 
 local function is_kb_down(vk)
-    local ok, result = pcall(function() return reframework:is_key_down(vk) end)
+    local ok, result = pcall(reframework.is_key_down, reframework, vk)
     return ok and result
 end
 
@@ -3043,6 +3046,31 @@ end
 _G._aa_log = { active = false, file = nil, frame = 0 }
 local _aa_log = _G._aa_log
 
+local function _dv_read_p1_input_new()
+    local sp = sdk.find_type_definition("gBattle"):get_field("Player"):get_data(nil)
+    if sp and sp.mcPlayer then
+        local p1 = sp.mcPlayer[0]
+        if p1 then
+            local td = p1:get_type_definition()
+            local f_in = td:get_field("pl_input_new")
+            return (f_in and f_in:get_data(p1)) or 0
+        end
+    end
+    return 0
+end
+
+local function _dv_read_p2_action_id()
+    local e = aa_get_p2_engine()
+    if e then return e:get_ActionID() end
+    return -1
+end
+
+local function _dv_read_p1_act_st()
+    local p1 = sdk.find_type_definition("gBattle"):get_field("Player"):get_data(nil).mcPlayer[0]
+    if p1 then return tonumber(tostring(p1:get_type_definition():get_field("act_st"):get_data(p1))) or 0 end
+    return 0
+end
+
 local function aa_tick()
     if not _G.TrainingModeActive or _G.IsInReplay or _G.FlowMapID == 10 then
         auto_activate.p2_mask = 0
@@ -3051,31 +3079,12 @@ local function aa_tick()
 
     if auto_activate.cooldown > 0 then auto_activate.cooldown = auto_activate.cooldown - 1 end
 
-    local p1_input_val = 0
-    pcall(function()
-        local sp = sdk.find_type_definition("gBattle"):get_field("Player"):get_data(nil)
-        if sp and sp.mcPlayer then
-            local p1 = sp.mcPlayer[0]
-            if p1 then
-                local td = p1:get_type_definition()
-                local f_in = td:get_field("pl_input_new")
-                p1_input_val = (f_in and f_in:get_data(p1)) or 0
-            end
-        end
-    end)
-    _G._aa_dbg_p1_input = p1_input_val
-    _G._aa_dbg_reset = auto_activate.reset_grace > 0
-    _G._aa_dbg_firing = auto_activate.is_firing
-    _G._aa_dbg_wait_n = auto_activate.waiting_neutral
-    _G._aa_dbg_cooldown = auto_activate.cooldown
-
+    local ok_in, in_val = pcall(_dv_read_p1_input_new)
+    local p1_input_val = (ok_in and in_val) or 0
     if _aa_log.active and _aa_log.file then
         _aa_log.frame = _aa_log.frame + 1
-        local p2_act = -1
-        pcall(function()
-            local e = aa_get_p2_engine()
-            if e then p2_act = e:get_ActionID() end
-        end)
+        local ok_pa, pa = pcall(_dv_read_p2_action_id)
+        local p2_act = (ok_pa and pa) or -1
         _aa_log.file:write(string.format("%d\tgr=%d\tp1=%d\tcd=%d\tfire=%s\twn=%s\twin=%s\tmask=%d\tdly=%d\ttrk=%d\tp2act=%d\n",
             _aa_log.frame, auto_activate.reset_grace, p1_input_val,
             auto_activate.cooldown, tostring(auto_activate.is_firing),
@@ -3084,14 +3093,6 @@ local function aa_tick()
             auto_activate.tracked_action_id or -1, p2_act))
     end
 
-    if auto_activate.reset_grace > 0 and p1_input_val ~= 0 then
-        auto_activate.reset_grace = 0
-        auto_activate.was_in_range = true
-        auto_activate.cooldown = 0
-        auto_activate.waiting_neutral = false
-        auto_activate.tracked_action_id = -1
-    end
-    _G._aa_dbg_grace = auto_activate.reset_grace
     if auto_activate.reset_grace > 0 then
         auto_activate.reset_grace = auto_activate.reset_grace - 1
         auto_activate.was_in_range = true
@@ -3242,21 +3243,45 @@ local function aa_tick()
         effective_ar = best_ar * (1 + math.abs(roll) * 0.04)
     end
 
+    local c2c = math.abs(p1_cache.world_x - p2_cache.world_x) * 100
     local in_range = false
     if best_jump then
-        local real_dist = math.abs(p1_cache.world_x - p2_cache.world_x) * 100
-        in_range = real_dist < effective_ar
+        in_range = c2c < effective_ar
     else
         local _, dist = get_closest_edge(1)
         if not dist then return end
+        if c2c > 400 and dist < 1 then return end
         in_range = dist <= effective_ar + 0.0000001
     end
 
-    local p1_act_st = 0
-    pcall(function()
-        local p1 = sdk.find_type_definition("gBattle"):get_field("Player"):get_data(nil).mcPlayer[0]
-        if p1 then p1_act_st = tonumber(tostring(p1:get_type_definition():get_field("act_st"):get_data(p1))) or 0 end
-    end)
+    local ok_st, st_val = pcall(_dv_read_p1_act_st)
+    local p1_act_st = (ok_st and st_val) or 0
+
+    local _edge_dist_dbg = -1
+    if not best_jump then
+        local _, ed = get_closest_edge(1)
+        _edge_dist_dbg = ed or -1
+    end
+    if _edge_dist_dbg >= 0 then
+        local gap = c2c / 100 - _edge_dist_dbg
+        if auto_activate.gap_prev then
+            local delta = math.abs(gap - auto_activate.gap_prev)
+            if delta > 0.1 then
+                auto_activate.gap_grace = auto_activate.gap_grace_duration or 1
+            end
+        end
+        auto_activate.gap_prev = gap
+    end
+
+    if (auto_activate.gap_grace or 0) > 0 then
+        auto_activate.gap_grace = auto_activate.gap_grace - 1
+        auto_activate.was_in_range = true
+        auto_activate.cooldown = 0
+        auto_activate.waiting_neutral = false
+        if auto_activate.is_firing then aa_stop_fire(); auto_activate.waiting_neutral = false end
+        if auto_activate.delay_counter > 0 then auto_activate.delay_counter = 0 end
+        return
+    end
 
     if in_range and not auto_activate.was_in_range and auto_activate.cooldown <= 0 and p1_act_st ~= 9 and p1_act_st ~= 10 then
         local delay = roll or (d_min + math.random(0, d_max - d_min))
@@ -3282,30 +3307,29 @@ local function aa_tick()
 
     auto_activate.was_in_range = in_range
     if auto_activate.was_in_range and not in_range then auto_activate._anticipation_roll = nil end
-    auto_activate.dbg_in_range = in_range
-    auto_activate.dbg_p1_ft = p1_act_st
 
 end
 
 -- Register AA input injection with shared pl_input_sub hook (0_SharedHooks.lua)
 local _dv_gBattle_td = sdk.find_type_definition("gBattle")
+local function _dv_apply_p2_input_mask()
+    local p2 = _dv_gBattle_td:get_field("Player"):get_data(nil).mcPlayer[1]
+    if not p2 then return end
+    local final_mask = auto_activate.p2_mask
+    if p2:get_field("rl_dir") then
+        local has_right = (final_mask & 4) ~= 0
+        local has_left  = (final_mask & 8) ~= 0
+        final_mask = final_mask & ~12
+        if has_right then final_mask = final_mask | 8 end
+        if has_left  then final_mask = final_mask | 4 end
+    end
+    p2:set_field("pl_input_new", final_mask)
+    p2:set_field("pl_sw_new", final_mask)
+end
 if _G._shared_input_post then
     table.insert(_G._shared_input_post, function(p_id, retval)
         if p_id == 1 and (auto_activate.is_firing or auto_activate.footwork_enabled) and auto_activate.p2_mask > 0 then
-            pcall(function()
-                local p2 = _dv_gBattle_td:get_field("Player"):get_data(nil).mcPlayer[1]
-                if not p2 then return end
-                local final_mask = auto_activate.p2_mask
-                if p2:get_field("rl_dir") then
-                    local has_right = (final_mask & 4) ~= 0
-                    local has_left  = (final_mask & 8) ~= 0
-                    final_mask = final_mask & ~12
-                    if has_right then final_mask = final_mask | 8 end
-                    if has_left  then final_mask = final_mask | 4 end
-                end
-                p2:set_field("pl_input_new", final_mask)
-                p2:set_field("pl_sw_new", final_mask)
-            end)
+            pcall(_dv_apply_p2_input_mask)
         end
     end)
 end
@@ -3329,6 +3353,74 @@ pcall(function()
 end)
 
 local _dv_last_window_rect = nil -- saved from on_draw_ui, used next frame
+
+local function _dv_save_window_rect()
+    local wpos = imgui.get_window_pos()
+    local wsz = imgui.get_window_size()
+    _dv_last_window_rect = { x = wpos.x, y = wpos.y, w = wsz.x, h = wsz.y }
+end
+
+local function _dv_read_stage_timer(g) return g.stage_timer end
+
+local function _dv_dump_web_state()
+    local st = {
+        p1_char = p1_cache and (p1_cache.adv_name or get_real_name(p1_cache.real_name)) or "",
+        p2_char = p2_cache and (p2_cache.adv_name or get_real_name(p2_cache.real_name)) or "",
+        p1_prefs = advanced_prefs[0] or {},
+        p2_prefs = advanced_prefs[1] or {},
+        p1_show_all = config.p1_show_all,
+        p2_show_all = config.p2_show_all,
+        p1_facing_right = not not (p1_cache and p1_cache.facing_right),
+        p2_facing_right = not not (p2_cache and p2_cache.facing_right),
+        aa_enabled = auto_activate.enabled,
+        aa_delay_min = auto_activate.delay_min,
+        aa_delay_max = auto_activate.delay_max,
+        aa_delay_cancel = config.aa_delay_cancel,
+        aa_neutral_buffer = auto_activate.neutral_buffer,
+        aa_footwork = auto_activate.footwork_enabled,
+        aa_fw = auto_activate.footwork_fw,
+        aa_bw = auto_activate.footwork_bw,
+        aa_fw_mode = auto_activate.footwork_mode,
+        aa_fw_cr = auto_activate.footwork_cr,
+        aa_fw_cr_min = auto_activate.footwork_cr_min,
+        aa_fw_cr_max = auto_activate.footwork_cr_max,
+        is_replay = (_G.IsInReplay == true) or (_G.FlowMapID == 10),
+        aa_move = auto_activate.move and auto_activate.move.input or "",
+        aa_moves = {},
+        aa_subs = {},
+    }
+    if _G._dv_aa_moves then
+        for _, mv in ipairs(_G._dv_aa_moves) do
+            st.aa_moves[#st.aa_moves + 1] = mv.input
+        end
+    end
+    for input, entry in pairs(auto_activate.sub_moves) do
+        st.aa_subs[#st.aa_subs + 1] = { input = input, weight = entry.weight }
+    end
+    json.dump_file(_web_state_file, st)
+end
+
+local function _dv_rebuild_aa_moves()
+    local p2_rname = p2_cache.adv_name or get_real_name(p2_cache.real_name)
+    local am = {}
+    local cd = advanced_data[p2_rname]
+    if cd and cd.moves then for _, m in ipairs(cd.moves) do am[#am + 1] = m end end
+    local p2_base = esf_names_map[p2_cache.real_name] or p2_cache.real_name
+    if p2_rname ~= p2_base then
+        local cd_base = advanced_data[p2_base]
+        if cd_base and cd_base.moves then
+            for _, m in ipairs(cd_base.moves) do
+                local found = false
+                for _, existing in ipairs(am) do if existing.input == m.input then found = true; break end end
+                if not found then am[#am + 1] = m end
+            end
+        end
+    end
+    table.sort(am, function(a, b) return (a.ar or 0) > (b.ar or 0) end)
+    local jf = jump_data_store[p2_cache.real_name]
+    if jf and jf.cross_up_st then am[#am + 1] = { input = "FORWARD JUMP", ar = jf.cross_up_st, is_jump = true } end
+    _G._dv_aa_moves = am
+end
 
 															  
 					 
@@ -3383,67 +3475,11 @@ re.on_frame(function()
     _web_state_counter = _web_state_counter + 1
     if _web_state_counter >= 60 then
         _web_state_counter = 0
-        pcall(function()
-            local st = {
-                p1_char = p1_cache and (p1_cache.adv_name or get_real_name(p1_cache.real_name)) or "",
-                p2_char = p2_cache and (p2_cache.adv_name or get_real_name(p2_cache.real_name)) or "",
-                p1_prefs = advanced_prefs[0] or {},
-                p2_prefs = advanced_prefs[1] or {},
-                p1_show_all = config.p1_show_all,
-                p2_show_all = config.p2_show_all,
-                p1_facing_right = not not (p1_cache and p1_cache.facing_right),
-                p2_facing_right = not not (p2_cache and p2_cache.facing_right),
-                aa_enabled = auto_activate.enabled,
-                aa_delay_min = auto_activate.delay_min,
-                aa_delay_max = auto_activate.delay_max,
-                aa_delay_cancel = config.aa_delay_cancel,
-                aa_neutral_buffer = auto_activate.neutral_buffer,
-                aa_footwork = auto_activate.footwork_enabled,
-                aa_fw = auto_activate.footwork_fw,
-                aa_bw = auto_activate.footwork_bw,
-                aa_fw_mode = auto_activate.footwork_mode,
-                aa_fw_cr = auto_activate.footwork_cr,
-                aa_fw_cr_min = auto_activate.footwork_cr_min,
-                aa_fw_cr_max = auto_activate.footwork_cr_max,
-                is_replay = (_G.IsInReplay == true) or (_G.FlowMapID == 10),
-                aa_move = auto_activate.move and auto_activate.move.input or "",
-                aa_moves = {},
-                aa_subs = {},
-            }
-            if _G._dv_aa_moves then
-                for _, mv in ipairs(_G._dv_aa_moves) do
-                    st.aa_moves[#st.aa_moves + 1] = mv.input
-                end
-            end
-            for input, entry in pairs(auto_activate.sub_moves) do
-                st.aa_subs[#st.aa_subs + 1] = { input = input, weight = entry.weight }
-            end
-            json.dump_file(_web_state_file, st)
-        end)
+        pcall(_dv_dump_web_state)
     end
     -- Build AA moves list for web bridge (always, not just when ImGui header is open)
     if p2_cache and p2_cache.valid then
-        pcall(function()
-            local p2_rname = p2_cache.adv_name or get_real_name(p2_cache.real_name)
-            local am = {}
-            local cd = advanced_data[p2_rname]
-            if cd and cd.moves then for _, m in ipairs(cd.moves) do am[#am + 1] = m end end
-            local p2_base = esf_names_map[p2_cache.real_name] or p2_cache.real_name
-            if p2_rname ~= p2_base then
-                local cd_base = advanced_data[p2_base]
-                if cd_base and cd_base.moves then
-                    for _, m in ipairs(cd_base.moves) do
-                        local found = false
-                        for _, existing in ipairs(am) do if existing.input == m.input then found = true; break end end
-                        if not found then am[#am + 1] = m end
-                    end
-                end
-            end
-            table.sort(am, function(a, b) return (a.ar or 0) > (b.ar or 0) end)
-            local jf = jump_data_store[p2_cache.real_name]
-            if jf and jf.cross_up_st then am[#am + 1] = { input = "FORWARD JUMP", ar = jf.cross_up_st, is_jump = true } end
-            _G._dv_aa_moves = am
-        end)
+        pcall(_dv_rebuild_aa_moves)
     end
     if _G._dv_aa_pending_input and _G._dv_aa_moves then
         local target = _G._dv_aa_pending_input
@@ -3480,7 +3516,8 @@ re.on_frame(function()
     if _dv_last_window_rect then all_rects[#all_rects + 1] = _dv_last_window_rect end
     -- From REF menu (last frame)
     local ref_open = false
-    pcall(function() ref_open = reframework:is_drawing_ui() end)
+    local ok_ref, drawing_ui = pcall(reframework.is_drawing_ui, reframework)
+    if ok_ref then ref_open = drawing_ui end
     if not ref_open then _G._ref_menu_rect = nil end
     if _G._ref_menu_rect then all_rects[#all_rects + 1] = _G._ref_menu_rect end
 
@@ -3513,7 +3550,7 @@ re.on_frame(function()
     local should_update = true
     local sGame = gBattle:get_field("Game"):get_data(nil)
     if sGame then
-        local success, current_timer = pcall(function() return sGame.stage_timer end)
+        local success, current_timer = pcall(_dv_read_stage_timer, sGame)
         if success and current_timer ~= nil then
             if current_timer == last_stage_timer then
                 frozen_frames = frozen_frames + 1
@@ -4023,11 +4060,7 @@ re.on_frame(function()
 
         if imgui.begin_window("SF6 DISTANCE VIEWER", true, window_flags) then
             -- Save rect for next frame's click detection (on_draw_ui runs after on_frame)
-            pcall(function()
-                local wpos = imgui.get_window_pos()
-                local wsz = imgui.get_window_size()
-                _dv_last_window_rect = { x = wpos.x, y = wpos.y, w = wsz.x, h = wsz.y }
-            end)
+            pcall(_dv_save_window_rect)
             if ui_font.obj then imgui.push_font(ui_font.obj) end
             
             -- Checkbox to hide the floating window from within itself

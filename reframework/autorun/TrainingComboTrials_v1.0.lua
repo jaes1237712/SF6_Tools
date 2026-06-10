@@ -843,46 +843,53 @@ local function get_luke_charge_windows(p_char)
     return windows
 end
 
+-- Hoisted hot-path helper (no per-call closure). Scratch table preserves
+-- partial-write semantics if an SDK call errors mid-body.
+local _ct_action_scratch = { act_id = -1, frame = 0, state_flags = -1, action_code = 0, direct_input = 0, branch_type = 0 }
+local function _ct_read_action_data(p_obj)
+    local r = _ct_action_scratch
+    local p_def = p_obj:get_type_definition()
+    local d = (p_def:get_field("pl_input_new"):get_data(p_obj)) or 0
+    local b = (p_def:get_field("pl_sw_new"):get_data(p_obj)) or 0
+    r.direct_input = d | b
+
+    local act_param = p_obj:get_field("mpActParam")
+    if not act_param then return end
+    local action_part = act_param:get_field("ActionPart")
+    if action_part then
+        local engine = action_part:get_field("_Engine")
+        if engine then
+            r.act_id = engine:call("get_ActionID") or -1
+            local sf = engine:call("get_ActionFrame")
+            if sf then r.frame = tonumber(sf:call("ToString()")) or 0 end
+            local m_param = engine:get_field("mParam")
+            if m_param then
+                local sf_field = m_param:get_type_definition():get_field("state_flags")
+                if sf_field then r.state_flags = tonumber(sf_field:get_data(m_param)) or -1 end
+            end
+        end
+    end
+    local ki_field = act_param:get_type_definition():get_field("KeyInput")
+    if ki_field then
+        local ki_data = ki_field:get_data(act_param)
+        if ki_data then
+            local a_field = ki_data:get_type_definition():get_field("Action")
+            if a_field then r.action_code = tonumber(a_field:get_data(ki_data)) or 0 end
+        end
+    end
+    local branch = act_param:get_field("Branch")
+    if branch then
+        local bt_field = branch:get_type_definition():get_field("BranchType")
+        if bt_field then r.branch_type = tonumber(bt_field:get_data(branch)) or 0 end
+    end
+end
+
 local function get_action_data(p_obj)
     if not p_obj then return -1, 0, -1, 0, 0, 0 end
-    local act_id, frame, state_flags, action_code, direct_input, branch_type = -1, 0, -1, 0, 0, 0
-    pcall(function()
-        local p_def = p_obj:get_type_definition()
-        local d = (p_def:get_field("pl_input_new"):get_data(p_obj)) or 0
-        local b = (p_def:get_field("pl_sw_new"):get_data(p_obj)) or 0
-        direct_input = d | b
-
-        local act_param = p_obj:get_field("mpActParam")
-        if not act_param then return end
-        local action_part = act_param:get_field("ActionPart")
-        if action_part then
-            local engine = action_part:get_field("_Engine")
-            if engine then
-                act_id = engine:call("get_ActionID") or -1
-                local sf = engine:call("get_ActionFrame")
-                if sf then frame = tonumber(sf:call("ToString()")) or 0 end
-                local m_param = engine:get_field("mParam")
-                if m_param then
-                    local sf_field = m_param:get_type_definition():get_field("state_flags")
-                    if sf_field then state_flags = tonumber(sf_field:get_data(m_param)) or -1 end
-                end
-            end
-        end
-        local ki_field = act_param:get_type_definition():get_field("KeyInput")
-        if ki_field then
-            local ki_data = ki_field:get_data(act_param)
-            if ki_data then
-                local a_field = ki_data:get_type_definition():get_field("Action")
-                if a_field then action_code = tonumber(a_field:get_data(ki_data)) or 0 end
-            end
-        end
-        local branch = act_param:get_field("Branch")
-        if branch then
-            local bt_field = branch:get_type_definition():get_field("BranchType")
-            if bt_field then branch_type = tonumber(bt_field:get_data(branch)) or 0 end
-        end
-    end)
-    return act_id, frame, state_flags, action_code, direct_input, branch_type
+    local r = _ct_action_scratch
+    r.act_id, r.frame, r.state_flags, r.action_code, r.direct_input, r.branch_type = -1, 0, -1, 0, 0, 0
+    pcall(_ct_read_action_data, p_obj)
+    return r.act_id, r.frame, r.state_flags, r.action_code, r.direct_input, r.branch_type
 end
 
 local function get_damage_type_safe(p_char)
@@ -910,11 +917,12 @@ local function check_is_projectile(attacker_idx, attacker_obj, gBattle)
     return (attacker_hs == 0)
 end
 
+local function _ct_read_combo_cnt(p_obj)
+    return p_obj:get_type_definition():get_field("combo_cnt"):get_data(p_obj) or 0
+end
 local function get_combo_count(p_obj)
     if not p_obj then return 0 end
-    local s, res = pcall(function()
-        return p_obj:get_type_definition():get_field("combo_cnt"):get_data(p_obj) or 0
-    end)
+    local s, res = pcall(_ct_read_combo_cnt, p_obj)
     return s and res or 0
 end
 
@@ -957,18 +965,19 @@ local function snapshot_gauges(attacker_idx)
 end
 
 -- Force l'injection des HP exacts sur un joueur
+local function _ct_do_inject_vital(player_idx, hp)
+    local gBattle = _td_gBattle
+    if not gBattle then return end
+    local sP = gBattle:get_field("Player"):get_data(nil)
+    if not sP then return end
+    local p = sP:call("getPlayer", player_idx)
+    if not p then return end
+    p.vital_new = hp
+    p.vital_old = hp
+    p.heal_new = hp
+end
 local function inject_player_vital(player_idx, hp)
-    pcall(function()
-        local gBattle = _td_gBattle
-        if not gBattle then return end
-        local sP = gBattle:get_field("Player"):get_data(nil)
-        if not sP then return end
-        local p = sP:call("getPlayer", player_idx)
-        if not p then return end
-        p.vital_new = hp
-        p.vital_old = hp
-        p.heal_new = hp
-    end)
+    pcall(_ct_do_inject_vital, player_idx, hp)
 end
 
 -- Applique la vie (Victime = damage du combo, Attaquant = HP enregistré à l'étape 1)
@@ -1751,8 +1760,11 @@ local function get_hardware_pad_mask()
 end
 
 -- Lecture clavier via reframework API (avec fallback sécurisé)
+local function _ct_read_key(vk)
+    return reframework:is_key_down(vk)
+end
 local function is_kb_down(vk)
-    local ok, result = pcall(function() return reframework:is_key_down(vk) end)
+    local ok, result = pcall(_ct_read_key, vk)
     return ok and result
 end
 
@@ -2067,43 +2079,138 @@ local function build_fail_dump()
     return dump
 end
 
+-- =========================================================
+-- HOISTED HOT-PATH HELPERS (no per-frame closure allocations)
+-- =========================================================
+local function _ct_track_live_combo()
+    local gB = sdk.find_type_definition("gBattle")
+    if not gB then return end
+    local sP = gB:get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer or not sP.mcPlayer[0] then return end
+    local p1 = sP.mcPlayer[0]
+    local cc = p1:get_type_definition():get_field("combo_cnt"):get_data(p1) or 0
+
+    if not trial_state._onframe_last_cc then trial_state._onframe_last_cc = 0 end
+
+    if trial_state._pending_hit_delay and trial_state._pending_hit_delay > 0 then
+        trial_state._pending_hit_delay = trial_state._pending_hit_delay - 1
+        if trial_state._pending_hit_delay == 0 and trial_state.is_recording and #trial_state.sequence > 0 then
+            local last = trial_state.sequence[#trial_state.sequence]
+            last.has_hit = true
+            last.expected_combo = trial_state._pending_hit_cc
+            trial_state._pending_hit_cc = nil
+        end
+    end
+
+    if cc > trial_state._onframe_last_cc then
+        trial_state._hit_grace = 5
+        if trial_state.is_recording and #trial_state.sequence > 0 then
+            trial_state._pending_hit_cc = cc
+            trial_state._pending_hit_delay = 2
+        end
+    end
+
+    if trial_state._hit_grace and trial_state._hit_grace > 0 then
+        trial_state._hit_grace = trial_state._hit_grace - 1
+    end
+
+    trial_state._onframe_last_cc = cc
+end
+
+local function _ct_update_flip_live()
+    local gB = _td_gBattle
+    if not gB then return end
+    local sP = gB:get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer or not sP.mcPlayer[0] or not sP.mcPlayer[1] then return end
+    local r1 = sP.mcPlayer[0].pos.x.v
+    local r2 = sP.mcPlayer[1].pos.x.v
+    local facing_left = false
+    if trial_state.playing_player == 0 then
+        facing_left = (r1 > r2)
+    else
+        facing_left = (r2 > r1)
+    end
+    trial_state.flip_inputs = facing_left
+end
+
+local function _ct_replay_bridge_poll()
+    local b = json.load_file("SF6_TrainingRemoteControl_data/Replay_WebBridge.json")
+    if b and b._web_timestamp then
+        if not _G._replay_bridge_ts then _G._replay_bridge_ts = 0 end
+        if b._web_timestamp > _G._replay_bridge_ts then
+            _G._replay_bridge_ts = b._web_timestamp
+            if b.cmd == "record_p1" then _G.ComboTrials_ReplaySavePlayer = 0; start_recording(0) end
+            if b.cmd == "record_p2" then _G.ComboTrials_ReplaySavePlayer = 1; start_recording(1) end
+            if b.cmd == "stop_save" then _G.ComboTrials_ReplaySavePlayer = trial_state.recording_player; stop_recording_and_save() end
+            if b.cmd == "cancel" then
+                local cp = trial_state.recording_player
+                cancel_recording()
+                _G.ComboTrials_ReplayCanceled = cp
+            end
+            if b.cmd == "hide_ui" then _G._tsm_hide_ui = not _G._tsm_hide_ui end
+        end
+    end
+end
+
+local function _ct_detect_piyo()
+    local gB = _td_gBattle
+    if not gB then return end
+    local sP = gB:get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer or not sP.mcPlayer[1] then return end
+    local eng = sP.mcPlayer[1].mpActParam.ActionPart._Engine
+    if eng and (eng:get_ActionID() == 293 or eng:get_ActionID() == 294) then
+        trial_state._piyo_detected = true
+        trial_state._piyo_frame = trial_state._rec_frame_count
+    end
+end
+
+local function _ct_check_first_hit(player_obj)
+    local attacker_char = player_obj:call("getPlayer", trial_state.playing_player)
+    if attacker_char and get_combo_count(attacker_char) > 0 then
+        trial_state._first_hit_landed = true
+    end
+end
+
+local function _ct_get_player(player_obj, idx)
+    return player_obj:call("getPlayer", idx)
+end
+
+local function _ct_track_rec_gauges(victim, p_char, p_idx)
+    local BT = _td_gBattle:get_field("Team"):get_data(nil)
+    if victim and BT and BT.mcTeam then
+        local v_hp = victim.vital_new
+        local a_dr = p_char.focus_new
+        local a_sa = BT.mcTeam[p_idx].mSuperGauge
+
+        local rg = trial_state._rec_gauges
+        if v_hp and rg.min_victim_hp then rg.min_victim_hp = math.min(rg.min_victim_hp, v_hp) end
+        if a_dr and rg.min_atk_drive then rg.min_atk_drive = math.min(rg.min_atk_drive, a_dr) end
+        if a_sa and rg.min_atk_super then rg.min_atk_super = math.min(rg.min_atk_super, a_sa) end
+    end
+end
+
+local function _ct_capture_rec_hit_type(victim_obj)
+    if victim_obj then
+        local pc = victim_obj:get_type_definition():get_field("counter_fw_flag"):get_data(victim_obj)
+        local ch = victim_obj:get_type_definition():get_field("counter_dm_flag"):get_data(victim_obj)
+        if pc == true then
+            trial_state._rec_hit_type = "PC"
+        elseif ch == true and trial_state._rec_hit_type ~= "PC" then
+            trial_state._rec_hit_type = "CH"
+        end
+    end
+end
+
+local function _ct_check_knockdown(victim_obj)
+    if not victim_obj then return false end
+    local pose_st = victim_obj:get_type_definition():get_field("pose_st"):get_data(victim_obj)
+    return (pose_st or 0) == 3
+end
+
 local _replay_cleaned = false
 re.on_frame(function()
     -- Live combo tracking during recording (1-frame delay to let pl_input_sub create new steps first)
-    pcall(function()
-        local gB = sdk.find_type_definition("gBattle")
-        if not gB then return end
-        local sP = gB:get_field("Player"):get_data(nil)
-        if not sP or not sP.mcPlayer or not sP.mcPlayer[0] then return end
-        local p1 = sP.mcPlayer[0]
-        local cc = p1:get_type_definition():get_field("combo_cnt"):get_data(p1) or 0
-
-        if not trial_state._onframe_last_cc then trial_state._onframe_last_cc = 0 end
-
-        if trial_state._pending_hit_delay and trial_state._pending_hit_delay > 0 then
-            trial_state._pending_hit_delay = trial_state._pending_hit_delay - 1
-            if trial_state._pending_hit_delay == 0 and trial_state.is_recording and #trial_state.sequence > 0 then
-                local last = trial_state.sequence[#trial_state.sequence]
-                last.has_hit = true
-                last.expected_combo = trial_state._pending_hit_cc
-                trial_state._pending_hit_cc = nil
-            end
-        end
-
-        if cc > trial_state._onframe_last_cc then
-            trial_state._hit_grace = 5
-            if trial_state.is_recording and #trial_state.sequence > 0 then
-                trial_state._pending_hit_cc = cc
-                trial_state._pending_hit_delay = 2
-            end
-        end
-
-        if trial_state._hit_grace and trial_state._hit_grace > 0 then
-            trial_state._hit_grace = trial_state._hit_grace - 1
-        end
-
-        trial_state._onframe_last_cc = cc
-    end)
+    pcall(_ct_track_live_combo)
 
     -- Web bridge: handle commands
     if _G.CurrentTrainerMode == 4 and _G._tsm_web_cmd then
@@ -2221,21 +2328,7 @@ re.on_frame(function()
 
     -- Mise à jour live de flip_inputs (seulement avant le premier coup de la séquence)
     if trial_state.is_playing and trial_state.current_step == 1 then
-        pcall(function()
-            local gB = _td_gBattle
-            if not gB then return end
-            local sP = gB:get_field("Player"):get_data(nil)
-            if not sP or not sP.mcPlayer or not sP.mcPlayer[0] or not sP.mcPlayer[1] then return end
-            local r1 = sP.mcPlayer[0].pos.x.v
-            local r2 = sP.mcPlayer[1].pos.x.v
-            local facing_left = false
-            if trial_state.playing_player == 0 then
-                facing_left = (r1 > r2)
-            else
-                facing_left = (r2 > r1)
-            end
-            trial_state.flip_inputs = facing_left
-        end)
+        pcall(_ct_update_flip_live)
     end
 
     -- REPLAY REMOTE STATE (before mode gate so it always publishes)
@@ -2255,24 +2348,7 @@ re.on_frame(function()
 
     -- REPLAY REMOTE BRIDGE
     if _in_replay then
-        pcall(function()
-            local b = json.load_file("SF6_TrainingRemoteControl_data/Replay_WebBridge.json")
-            if b and b._web_timestamp then
-                if not _G._replay_bridge_ts then _G._replay_bridge_ts = 0 end
-                if b._web_timestamp > _G._replay_bridge_ts then
-                    _G._replay_bridge_ts = b._web_timestamp
-                    if b.cmd == "record_p1" then _G.ComboTrials_ReplaySavePlayer = 0; start_recording(0) end
-                    if b.cmd == "record_p2" then _G.ComboTrials_ReplaySavePlayer = 1; start_recording(1) end
-                    if b.cmd == "stop_save" then _G.ComboTrials_ReplaySavePlayer = trial_state.recording_player; stop_recording_and_save() end
-                    if b.cmd == "cancel" then
-                        local cp = trial_state.recording_player
-                        cancel_recording()
-                        _G.ComboTrials_ReplayCanceled = cp
-                    end
-                    if b.cmd == "hide_ui" then _G._tsm_hide_ui = not _G._tsm_hide_ui end
-                end
-            end
-        end)
+        pcall(_ct_replay_bridge_poll)
     end
 
     if _G.CurrentTrainerMode ~= 4 then
@@ -2393,17 +2469,7 @@ re.on_frame(function()
         if not trial_state._rec_frame_count then trial_state._rec_frame_count = 0 end
         trial_state._rec_frame_count = trial_state._rec_frame_count + 1
         if not trial_state._piyo_detected then
-            pcall(function()
-                local gB = _td_gBattle
-                if not gB then return end
-                local sP = gB:get_field("Player"):get_data(nil)
-                if not sP or not sP.mcPlayer or not sP.mcPlayer[1] then return end
-                local eng = sP.mcPlayer[1].mpActParam.ActionPart._Engine
-                if eng and (eng:get_ActionID() == 293 or eng:get_ActionID() == 294) then
-                    trial_state._piyo_detected = true
-                    trial_state._piyo_frame = trial_state._rec_frame_count
-                end
-            end)
+            pcall(_ct_detect_piyo)
         end
     end
 
@@ -2496,12 +2562,7 @@ re.on_frame(function()
         if trial_state._reset_grace and trial_state._reset_grace > 0 then
             trial_state._reset_grace = trial_state._reset_grace - 1
         elseif not trial_state._first_hit_landed and not is_refreshing then
-            pcall(function()
-                local attacker_char = player_obj:call("getPlayer", trial_state.playing_player)
-                if attacker_char and get_combo_count(attacker_char) > 0 then
-                    trial_state._first_hit_landed = true
-                end
-            end)
+            pcall(_ct_check_first_hit, player_obj)
         end
         local attacker_idx = trial_state.playing_player
         local victim_idx = 1 - attacker_idx
@@ -2636,23 +2697,11 @@ end
             -- Fetch victim once for all checks below
             local _victim_idx = 1 - p_idx
             local _victim_obj = nil
-            pcall(function() _victim_obj = player_obj:call("getPlayer", _victim_idx) end)
+            local _ok_vo, _vo = pcall(_ct_get_player, player_obj, _victim_idx)
+            if _ok_vo then _victim_obj = _vo end
 
             if trial_state.is_recording and p_idx == trial_state.recording_player and trial_state._rec_gauges then
-                pcall(function()
-                    local victim = _victim_obj
-                    local BT = gBattle:get_field("Team"):get_data(nil)
-                    if victim and BT and BT.mcTeam then
-                        local v_hp = victim.vital_new
-                        local a_dr = p_char.focus_new
-                        local a_sa = BT.mcTeam[p_idx].mSuperGauge
-
-                        local rg = trial_state._rec_gauges
-                        if v_hp and rg.min_victim_hp then rg.min_victim_hp = math.min(rg.min_victim_hp, v_hp) end
-                        if a_dr and rg.min_atk_drive then rg.min_atk_drive = math.min(rg.min_atk_drive, a_dr) end
-                        if a_sa and rg.min_atk_super then rg.min_atk_super = math.min(rg.min_atk_super, a_sa) end
-                    end
-                end)
+                pcall(_ct_track_rec_gauges, _victim_obj, p_char, p_idx)
             end
 
             -- Détection du hit pour le visuel (has_hit + actual_combo + projectile)
@@ -2718,29 +2767,13 @@ end
 
             -- Capture CH/PC en continu pendant le recording (indépendant du combo count pour DI etc.)
             if not trial_state._rec_hit_type and trial_state.is_recording and p_idx == trial_state.recording_player then
-                pcall(function()
-                    local victim_obj = _victim_obj
-                    if victim_obj then
-                        local pc = victim_obj:get_type_definition():get_field("counter_fw_flag"):get_data(victim_obj)
-                        local ch = victim_obj:get_type_definition():get_field("counter_dm_flag"):get_data(victim_obj)
-                        if pc == true then
-                            trial_state._rec_hit_type = "PC"
-                        elseif ch == true and trial_state._rec_hit_type ~= "PC" then
-                            trial_state._rec_hit_type = "CH"
-                        end
-                    end
-                end)
+                pcall(_ct_capture_rec_hit_type, _victim_obj)
             end
 
             -- Détection du knockdown adverse (pose_st == 3)
             local opponent_knocked_down = false
-            pcall(function()
-                local victim_obj = _victim_obj
-                if victim_obj then
-                    local pose_st = victim_obj:get_type_definition():get_field("pose_st"):get_data(victim_obj)
-                    if (pose_st or 0) == 3 then opponent_knocked_down = true end
-                end
-            end)
+            local _ok_kd, _kd = pcall(_ct_check_knockdown, _victim_obj)
+            if _ok_kd and _kd then opponent_knocked_down = true end
             -- Guard off dès que l'adversaire tombe (pour les okis)
             if trial_state.is_playing and opponent_knocked_down and not trial_state._guard_off_on_kd then
                 set_dummy_guard_type(0)
@@ -4054,6 +4087,10 @@ local _load_count   = 0
 
 if not _G._allow_stun_demo then _G._allow_stun_demo = false end
 
+local function _ct_get_field(obj, name)
+    return obj:get_field(name)
+end
+
 local _ss_hooked = false
 re.on_frame(function()
     if not _ss_hooked then
@@ -4125,8 +4162,8 @@ re.on_frame(function()
     if trial_state.is_playing and d2d_cfg.forced_position_idx ~= 1 then
         local tm2 = sdk.get_managed_singleton("app.training.TrainingManager")
         if tm2 then
-            local ok, ts = pcall(function() return tm2:get_field("_TrainingState") end)
-            local ok2, rf = pcall(function() return tm2:get_field("_IsReqRefresh") end)
+            local ok, ts = pcall(_ct_get_field, tm2, "_TrainingState")
+            local ok2, rf = pcall(_ct_get_field, tm2, "_IsReqRefresh")
             if ok and ok2 and ts == 2 and rf == true then
                 pcall(function()
                     tm2:set_field("_IsReqRefresh", false)
@@ -4209,36 +4246,37 @@ table.insert(_G._shared_input_pre, function(p_id, args)
 end)
 
 end
+local function _ct_clear_inputs(idx)
+    local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[idx]
+    if p1 then p1:set_field("pl_input_new", 0); p1:set_field("pl_sw_new", 0) end
+end
+
+local function _ct_demo_inject_mask()
+    local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[0]
+    local final_mask = demo_state.p1_mask
+    if not p1:get_field("rl_dir") then
+        local has_right = (final_mask & 4) ~= 0
+        local has_left  = (final_mask & 8) ~= 0
+        final_mask = final_mask & ~12
+        if has_right then final_mask = final_mask | 8 end
+        if has_left  then final_mask = final_mask | 4 end
+    end
+    local orig_in = p1:get_field("pl_input_new") or 0
+    local orig_sw = p1:get_field("pl_sw_new") or 0
+    p1:set_field("pl_input_new", orig_in | final_mask)
+    p1:set_field("pl_sw_new", orig_sw | final_mask)
+end
+
 if _G._shared_input_post then
 table.insert(_G._shared_input_post, function(p_id, retval)
     if p_id == 0 and trial_state.is_playing and trial_state.fail_timer and trial_state.fail_timer > 0 then
-        pcall(function()
-            local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[trial_state.playing_player]
-            if p1 then p1:set_field("pl_input_new", 0); p1:set_field("pl_sw_new", 0) end
-        end)
+        pcall(_ct_clear_inputs, trial_state.playing_player)
     end
     if p_id == 0 and _G.TrainingFuncHeld then
-        pcall(function()
-            local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[0]
-            if p1 then p1:set_field("pl_input_new", 0); p1:set_field("pl_sw_new", 0) end
-        end)
+        pcall(_ct_clear_inputs, 0)
     end
     if p_id == 0 and demo_state.is_playing and demo_state.p1_mask > 0 then
-        pcall(function()
-            local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[0]
-            local final_mask = demo_state.p1_mask
-            if not p1:get_field("rl_dir") then
-                local has_right = (final_mask & 4) ~= 0
-                local has_left  = (final_mask & 8) ~= 0
-                final_mask = final_mask & ~12
-                if has_right then final_mask = final_mask | 8 end
-                if has_left  then final_mask = final_mask | 4 end
-            end
-            local orig_in = p1:get_field("pl_input_new") or 0
-            local orig_sw = p1:get_field("pl_sw_new") or 0
-            p1:set_field("pl_input_new", orig_in | final_mask)
-            p1:set_field("pl_sw_new", orig_sw | final_mask)
-        end)
+        pcall(_ct_demo_inject_mask)
     end
 end)
 end

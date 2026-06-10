@@ -607,6 +607,48 @@ local function apply_data_to_character(target_id, data_table, source_name, live_
 end
 
 -- =========================================================
+-- PUBLIC API (consumed by Training Drills via _G._rsm_api)
+-- =========================================================
+_G._rsm_api = {
+    get_file_list = function()
+        if current_p2_id == -1 then return { "-- Select File --" }, {} end
+        local char_name = get_char_name(current_p2_id)
+        local folder = DATA_FOLDER .. "\\\\" .. char_name .. "\\\\.*json"
+        local files = fs.glob(folder)
+        local raw = {}
+        local display = { "-- Select File --" }
+        if files then
+            for _, fp in ipairs(files) do
+                local fn = fp:match("^.+\\(.+)$") or fp
+                table.insert(raw, fn)
+            end
+            table.sort(raw)
+            for _, fn in ipairs(raw) do
+                local name = fn:gsub("%.json$", "")
+                table.insert(display, name)
+            end
+        end
+        return display, raw
+    end,
+    import_and_activate = function(filename)
+        if current_p2_id == -1 then return "No character" end
+        if not filename or filename == "" then return "No file" end
+        if not filename:match("%.json$") then filename = filename .. ".json" end
+        local char_name = get_char_name(current_p2_id)
+        local full_path = get_char_folder(char_name) .. "/" .. filename
+        local data = json.load_file(full_path)
+        if not data then return "Load Failed: " .. filename end
+        activate_on_load = true
+        local result = apply_data_to_character(current_p2_id, data, filename)
+        if result:find("^Loaded:") then
+            loaded_file_name = filename:gsub("%.json$", "")
+        end
+        return result
+    end,
+    get_loaded_name = function() return loaded_file_name end,
+}
+
+-- =========================================================
 -- IMPORT REPLAY SINGLE (LIGNE PAR LIGNE)
 -- =========================================================
 local function import_single_replay_slot(slot_idx, filename)
@@ -1557,14 +1599,7 @@ re.on_draw_ui(function()
     end
 end)
 
-re.on_frame(function()
-
-    -- Overlay detection: pause + Recording/Reversal Settings tab
-    show_slot_overlay = false
-    show_reversal_overlay = false
-    show_rev_picker_overlay = false
-    reversal_slot_map = {}
-    pcall(function()
+local function _rsm_detect_overlays()
         local pm = sdk.get_managed_singleton("app.PauseManager")
         if not pm then return end
         local pause_bit = pm:get_field("_CurrentPauseTypeBit")
@@ -1607,7 +1642,16 @@ re.on_frame(function()
                 if has_any then show_reversal_overlay = true end
             end
         end
-    end)
+end
+
+re.on_frame(function()
+
+    -- Overlay detection: pause + Recording/Reversal Settings tab
+    show_slot_overlay = false
+    show_reversal_overlay = false
+    show_rev_picker_overlay = false
+    reversal_slot_map = {}
+    pcall(_rsm_detect_overlays)
     gui_has_ui11265 = false
     gui_has_picker = false
 
@@ -1615,20 +1659,22 @@ end)
 
 local picker_elements = { ui11261=true, ui11262=true, ui11263=true, ui11264=true, ui11265=true, ui11266=true }
 
+local function _rsm_scan_gui_element(element)
+    local go = element:call("get_GameObject")
+    if go then
+        local name = go:call("get_Name")
+        if name == "ui11265" then
+            gui_has_ui11265 = true
+            gui_has_picker = true
+        elseif picker_elements[name] then
+            gui_has_picker = true
+        end
+    end
+end
+
 re.on_pre_gui_draw_element(function(element, context)
     if gui_has_ui11265 and gui_has_picker then return true end
-    pcall(function()
-        local go = element:call("get_GameObject")
-        if go then
-            local name = go:call("get_Name")
-            if name == "ui11265" then
-                gui_has_ui11265 = true
-                gui_has_picker = true
-            elseif picker_elements[name] then
-                gui_has_picker = true
-            end
-        end
-    end)
+    pcall(_rsm_scan_gui_element, element)
     return true
 end)
 
@@ -1729,42 +1775,29 @@ pcall(function()
     if b and b._web_timestamp then _rsm_bridge_ts = b._web_timestamp end
 end)
 
-re.on_frame(function()
-    _rsm_web_counter = _rsm_web_counter + 1
-    if _rsm_web_counter < 10 then return end
-    _rsm_web_counter = 0
-
-    if current_p2_id ~= last_filtered_p2_id then
-        refresh_file_list()
-        refresh_filtered_list()
-        refresh_replay_list()
-        refresh_filtered_replay_list()
-        last_filtered_p2_id = current_p2_id
+local function _rsm_collect_slot_list(slot_list)
+    local slots, _ = get_slots_access(current_p2_id)
+    if slots then
+        for i = 0, 7 do
+            local s = slots:call("get_Item", i)
+            local raw_act = s:get_field("IsActive")
+            table.insert(slot_list, {
+                name = slot_names[i] or "",
+                weight = math.floor(s:get_field("Weight") or 0),
+                frames = math.floor(s:get_field("Frame") or 0),
+                active = (raw_act == true) or (raw_act == 1),
+                valid = s:get_field("IsValid") == true,
+            })
+        end
     end
+end
 
-    pcall(function()
+local function _rsm_write_web_state()
         local char_name = ""
         if current_p2_id ~= -1 then char_name = get_char_name(current_p2_id) end
 
         local slot_list = {}
-        local ok_slots = false
-        pcall(function()
-            local slots, _ = get_slots_access(current_p2_id)
-            if slots then
-                ok_slots = true
-                for i = 0, 7 do
-                    local s = slots:call("get_Item", i)
-                    local raw_act = s:get_field("IsActive")
-                    table.insert(slot_list, {
-                        name = slot_names[i] or "",
-                        weight = math.floor(s:get_field("Weight") or 0),
-                        frames = math.floor(s:get_field("Frame") or 0),
-                        active = (raw_act == true) or (raw_act == 1),
-                        valid = s:get_field("IsValid") == true,
-                    })
-                end
-            end
-        end)
+        pcall(_rsm_collect_slot_list, slot_list)
 
         local file_list = {}
         for _, f in ipairs(filtered_file_list or {}) do
@@ -1785,9 +1818,9 @@ re.on_frame(function()
             status_msg = status_msg or "",
             activate_on_load = activate_on_load or false,
         })
-    end)
+end
 
-    pcall(function()
+local function _rsm_read_web_bridge()
         local b = json.load_file("SF6_TrainingRemoteControl_data/RSM_WebBridge.json")
         if not b then return end
         local ts = b._web_timestamp or 0
@@ -1887,18 +1920,29 @@ re.on_frame(function()
             end
         end
 
-    end)
+end
+
+re.on_frame(function()
+    _rsm_web_counter = _rsm_web_counter + 1
+    if _rsm_web_counter < 10 then return end
+    _rsm_web_counter = 0
+
+    if current_p2_id ~= last_filtered_p2_id then
+        refresh_file_list()
+        refresh_filtered_list()
+        refresh_replay_list()
+        refresh_filtered_replay_list()
+        last_filtered_p2_id = current_p2_id
+    end
+
+    pcall(_rsm_write_web_state)
+    pcall(_rsm_read_web_bridge)
 end)
 
 -- =========================================================
 -- INPUT SEQUENCER: WebState + WebBridge (on_frame)
 -- =========================================================
-local _seq_web_tick = 0
-re.on_frame(function()
-    _seq_web_tick = _seq_web_tick + 1
-    if _seq_web_tick % 10 ~= 0 then return end
-
-    pcall(function()
+local function _rsm_write_seq_state()
         local seq_lines_out = {}
         for _, l in ipairs(seq_state.lines) do
             table.insert(seq_lines_out, { input = l.input, frames = l.frames, wait = l.wait or false })
@@ -1910,9 +1954,9 @@ re.on_frame(function()
             seq_loop = seq_state.loop,
             seq_player = seq_state.player_id,
         })
-    end)
+end
 
-    pcall(function()
+local function _rsm_read_seq_bridge()
         local b = json.load_file("SF6_TrainingRemoteControl_data/Sequencer_WebBridge.json")
         if not b then return end
         local ts = b._web_timestamp or 0
@@ -1967,12 +2011,72 @@ re.on_frame(function()
             seq_state.sub_idx = 1
             seq_state.waiting = false
         end
-    end)
+end
+
+local _seq_web_tick = 0
+re.on_frame(function()
+    _seq_web_tick = _seq_web_tick + 1
+    if _seq_web_tick % 10 ~= 0 then return end
+
+    pcall(_rsm_write_seq_state)
+    pcall(_rsm_read_seq_bridge)
 end)
 
 -- =========================================================
 -- INPUT SEQUENCER: injection via shared hook
 -- =========================================================
+local function _rsm_seq_wait_check()
+    local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[seq_state.player_id]
+    if not p1 then return end
+    local act_st = tonumber(tostring(p1:get_type_definition():get_field("act_st"):get_data(p1))) or -1
+    seq_state._dbg_act_st = act_st
+    if act_st == 0 then
+        seq_state.waiting = false
+        seq_state.sub_idx = 1
+        seq_state.current_idx = seq_state.current_idx + 1
+        if seq_state.current_idx > #seq_state.lines then
+            if seq_state.loop then
+                seq_state.current_idx = 1
+                seq_state.sub_idx = 1
+            else
+                seq_state.is_playing = false
+                seq_state.current_idx = 0
+            end
+        end
+    end
+end
+
+local function _rsm_seq_inject(line, dir_part, btn_part)
+    local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[seq_state.player_id]
+    if not p1 then return end
+
+    local final_dir, final_btn = 0, 0
+    if dir_part and #dir_part > 1 then
+        local digit = dir_part:sub(seq_state.sub_idx, seq_state.sub_idx)
+        final_dir = SEQ_NUMPAD_DIR[digit] or 0
+        if seq_state.sub_idx == #dir_part and btn_part and btn_part ~= "" then
+            for bp in btn_part:gmatch("[^+]+") do final_btn = final_btn | (SEQ_BTN[bp] or 0) end
+        end
+    else
+        final_dir = line.dir_mask
+        final_btn = line.btn_mask
+    end
+
+    if not p1:get_field("rl_dir") then
+        local has_right = (final_dir & 4) ~= 0
+        local has_left  = (final_dir & 8) ~= 0
+        final_dir = final_dir & ~12
+        if has_right then final_dir = final_dir | 8 end
+        if has_left  then final_dir = final_dir | 4 end
+    end
+
+    local combined = final_dir | final_btn
+    local orig_in = p1:get_field("pl_input_new") or 0
+    local orig_sw = p1:get_field("pl_sw_new") or 0
+    p1:set_field("pl_input_new", orig_in | combined)
+    p1:set_field("pl_sw_new", orig_sw | combined)
+end
+
 if _G._shared_input_post then
     table.insert(_G._shared_input_post, function(p_id, retval)
         if not seq_state.is_playing then return end
@@ -1989,26 +2093,7 @@ if _G._shared_input_post then
         local line = seq_state.lines[seq_state.current_idx]
 
         if seq_state.waiting then
-            pcall(function()
-                local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[seq_state.player_id]
-                if not p1 then return end
-                local act_st = tonumber(tostring(p1:get_type_definition():get_field("act_st"):get_data(p1))) or -1
-                seq_state._dbg_act_st = act_st
-                if act_st == 0 then
-                    seq_state.waiting = false
-                    seq_state.sub_idx = 1
-                    seq_state.current_idx = seq_state.current_idx + 1
-                    if seq_state.current_idx > #seq_state.lines then
-                        if seq_state.loop then
-                            seq_state.current_idx = 1
-                            seq_state.sub_idx = 1
-                        else
-                            seq_state.is_playing = false
-                            seq_state.current_idx = 0
-                        end
-                    end
-                end
-            end)
+            pcall(_rsm_seq_wait_check)
             return
         end
 
@@ -2019,36 +2104,7 @@ if _G._shared_input_post then
         local num_subs = (dir_part and #dir_part > 1) and #dir_part or 1
         if seq_state.sub_idx < 1 then seq_state.sub_idx = 1 end
 
-        pcall(function()
-            local p1 = _td_gBattle:get_field("Player"):get_data(nil).mcPlayer[seq_state.player_id]
-            if not p1 then return end
-
-            local final_dir, final_btn = 0, 0
-            if dir_part and #dir_part > 1 then
-                local digit = dir_part:sub(seq_state.sub_idx, seq_state.sub_idx)
-                final_dir = SEQ_NUMPAD_DIR[digit] or 0
-                if seq_state.sub_idx == #dir_part and btn_part and btn_part ~= "" then
-                    for bp in btn_part:gmatch("[^+]+") do final_btn = final_btn | (SEQ_BTN[bp] or 0) end
-                end
-            else
-                final_dir = line.dir_mask
-                final_btn = line.btn_mask
-            end
-
-            if not p1:get_field("rl_dir") then
-                local has_right = (final_dir & 4) ~= 0
-                local has_left  = (final_dir & 8) ~= 0
-                final_dir = final_dir & ~12
-                if has_right then final_dir = final_dir | 8 end
-                if has_left  then final_dir = final_dir | 4 end
-            end
-
-            local combined = final_dir | final_btn
-            local orig_in = p1:get_field("pl_input_new") or 0
-            local orig_sw = p1:get_field("pl_sw_new") or 0
-            p1:set_field("pl_input_new", orig_in | combined)
-            p1:set_field("pl_sw_new", orig_sw | combined)
-        end)
+        pcall(_rsm_seq_inject, line, dir_part, btn_part)
 
         if seq_state.frame_counter >= line.frames then
             seq_state.frame_counter = 0

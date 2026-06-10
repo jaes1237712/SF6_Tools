@@ -275,7 +275,47 @@ local is_kb_binding_mode = false
 local last_kb_0_state = false
 
 -- CORRECTED: 64 = X (Xbox) / Square (PS)
-local BTN_SQUARE = 64 
+local BTN_SQUARE = 64
+
+-- Hoisted to file scope to avoid per-frame closure/table allocations (hot path)
+local _TSM_MODIFIER_VKS = {0x10, 0x11, 0x12, 0x5B, 0x5C}
+local _TSM_MOD_SET = {}
+for _, mk in ipairs(_TSM_MODIFIER_VKS) do _TSM_MOD_SET[mk] = true end
+
+local function _tsm_scan_kb_binding()
+    local mods_held = {}
+    for _, mk in ipairs(_TSM_MODIFIER_VKS) do
+        if reframework:is_key_down(mk) then mods_held[#mods_held + 1] = mk end
+    end
+
+    for vk = 0x08, 0x7F do
+        if not _TSM_MOD_SET[vk] and reframework:is_key_down(vk) then
+            config.switch_key = vk
+            config.switch_modifiers = mods_held
+            save_config()
+            is_kb_binding_mode = false
+            break
+        end
+    end
+end
+
+local function _tsm_vk_in_list(list, vk)
+    for _, m in ipairs(list) do
+        if m == vk then return true end
+    end
+    return false
+end
+
+local function _tsm_check_kb_switch(switch_vk, switch_mods)
+    if not reframework:is_key_down(switch_vk) then return false end
+    for _, m in ipairs(switch_mods) do
+        if not reframework:is_key_down(m) then return false end
+    end
+    for _, m in ipairs(_TSM_MODIFIER_VKS) do
+        if not _tsm_vk_in_list(switch_mods, m) and reframework:is_key_down(m) then return false end
+    end
+    return true
+end
 
 local function handle_input()
     local gamepad_manager = sdk.get_native_singleton("via.hid.GamePad")
@@ -309,26 +349,7 @@ local function handle_input()
 
     -- KEYBOARD BINDING LOGIC (scan all keys, capture modifiers)
     if is_kb_binding_mode then
-        pcall(function()
-            local MODIFIER_VKS = {0x10, 0x11, 0x12, 0x5B, 0x5C}
-            local mod_set = {}
-            for _, mk in ipairs(MODIFIER_VKS) do mod_set[mk] = true end
-
-            local mods_held = {}
-            for _, mk in ipairs(MODIFIER_VKS) do
-                if reframework:is_key_down(mk) then mods_held[#mods_held + 1] = mk end
-            end
-
-            for vk = 0x08, 0x7F do
-                if not mod_set[vk] and reframework:is_key_down(vk) then
-                    config.switch_key = vk
-                    config.switch_modifiers = mods_held
-                    save_config()
-                    is_kb_binding_mode = false
-                    break
-                end
-            end
-        end)
+        pcall(_tsm_scan_kb_binding)
         if is_kb_binding_mode then return end -- still waiting for a key
     end
 
@@ -344,20 +365,8 @@ local function handle_input()
     -- SCRIPT SWITCH LOGIC (configurable keyboard key + modifiers)
     local switch_vk = config.switch_key or 0x30
     local switch_mods = config.switch_modifiers or {}
-    local ALL_MODS = {0x10, 0x11, 0x12, 0x5B, 0x5C}
-    local is_kb_0_down = false
-    pcall(function()
-        if not reframework:is_key_down(switch_vk) then return end
-        local required = {}
-        for _, m in ipairs(switch_mods) do required[m] = true end
-        for _, m in ipairs(switch_mods) do
-            if not reframework:is_key_down(m) then return end
-        end
-        for _, m in ipairs(ALL_MODS) do
-            if not required[m] and reframework:is_key_down(m) then return end
-        end
-        is_kb_0_down = true
-    end)
+    local ok_kb, kb_down = pcall(_tsm_check_kb_switch, switch_vk, switch_mods)
+    local is_kb_0_down = ok_kb and kb_down == true
     local is_kb_0_pressed = is_kb_0_down and not last_kb_0_state
 
     -- Trigger switch if either Pad combo or Keyboard key is pressed
@@ -391,7 +400,50 @@ end
 
 local function safe_call(obj, method, arg)
     if not obj then return end
-    pcall(function() obj:call(method, arg) end)
+    pcall(obj.call, obj, method, arg)
+end
+
+local function _tsm_apply_widget_visibility(entries, scripts_active)
+    local count = entries:call("get_Count")
+    for i = 0, count - 1 do
+        local entry = entries:call("get_Item", i)
+        if entry then
+            local widget_list = entry:get_field("value")
+            if widget_list then
+                local w_count = widget_list:call("get_Count")
+                for j = 0, w_count - 1 do
+                    local widget = widget_list:call("get_Item", j)
+                    if widget then
+                        local type_def = widget:get_type_definition()
+                        if type_def then
+                            local full_name = type_def:get_full_name()
+                            if string.find(full_name, "TMAttackInfo") then
+                                local attack_infos = widget:get_field("AttackInfos")
+                                if attack_infos then
+                                    local len = attack_infos:call("get_Length")
+                                    for k = 0, len - 1 do
+                                        local line = attack_infos:call("GetValue", k)
+                                        if line then
+                                            local texts = { line:get_field("LeftText"), line:get_field("CenterText"), line:get_field("RightText") }
+                                            for _, txt_obj in ipairs(texts) do
+                                                if txt_obj then safe_call(txt_obj, "set_Visible", not scripts_active) end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                            if string.find(full_name, "UIWidget_TMTicker") then
+                                if not scripts_active then
+                                    safe_call(widget, "set_Visible", true)
+                                    safe_call(widget, "set_ForceInvisible", false)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
 end
 
 local function manage_ui_visibility(scripts_active)
@@ -399,50 +451,9 @@ local function manage_ui_visibility(scripts_active)
     if mgr then
         local dict = mgr:get_field("_ViewUIWigetDict")
         local entries = dict and dict:get_field("_entries")
-        
+
         if entries then
-            pcall(function()
-                local count = entries:call("get_Count")
-                for i = 0, count - 1 do
-                    local entry = entries:call("get_Item", i)
-                    if entry then
-                        local widget_list = entry:get_field("value")
-                        if widget_list then
-                            local w_count = widget_list:call("get_Count")
-                            for j = 0, w_count - 1 do
-                                local widget = widget_list:call("get_Item", j)
-                                if widget then
-                                    local type_def = widget:get_type_definition()
-                                    if type_def then
-                                        local full_name = type_def:get_full_name()
-                                        if string.find(full_name, "TMAttackInfo") then
-                                            local attack_infos = widget:get_field("AttackInfos")
-                                            if attack_infos then
-                                                local len = attack_infos:call("get_Length")
-                                                for k = 0, len - 1 do
-                                                    local line = attack_infos:call("GetValue", k)
-                                                    if line then
-                                                        local texts = { line:get_field("LeftText"), line:get_field("CenterText"), line:get_field("RightText") }
-                                                        for _, txt_obj in ipairs(texts) do
-                                                            if txt_obj then safe_call(txt_obj, "set_Visible", not scripts_active) end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                        if string.find(full_name, "UIWidget_TMTicker") then
-                                            if not scripts_active then
-                                                safe_call(widget, "set_Visible", true)
-                                                safe_call(widget, "set_ForceInvisible", false)
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end)
+            pcall(_tsm_apply_widget_visibility, entries, scripts_active)
         end
     end
 end
@@ -578,14 +589,16 @@ local _tsm_replay_delay = 3.00  -- secondes avant de relancer le script après u
 local _tsm_replay_timer = 0
 local _tsm_was_replay = false
 
+local function _tsm_read_flowmap_id()
+    local bfm = sdk.get_managed_singleton("app.bFlowManager")
+    if not bfm then return nil end
+    local work = bfm:get_field("m_flow_work")
+    if work and work._FlowMap then return work._FlowMap._ID end
+    return nil
+end
+
 local function get_flowmap_id()
-    local ok, id = pcall(function()
-        local bfm = sdk.get_managed_singleton("app.bFlowManager")
-        if not bfm then return nil end
-        local work = bfm:get_field("m_flow_work")
-        if work and work._FlowMap then return work._FlowMap._ID end
-        return nil
-    end)
+    local ok, id = pcall(_tsm_read_flowmap_id)
     return ok and id or nil
 end
 
@@ -616,6 +629,68 @@ pcall(function()
     end
 end)
 
+-- Hoisted to file scope to avoid per-frame closure allocations (hot path)
+local function _tsm_update_hide_rect()
+    local sw, sh = SharedUI.get_screen_size()
+    local lb_off = SharedUI.get_letterbox_offset()
+    local hb = config.hide_btn
+    _G._tsm_hide_rect.x = sw * hb.x_pct
+    _G._tsm_hide_rect.y = lb_off + (sh - lb_off * 2) * hb.y_pct
+    _G._tsm_hide_rect.w = sw * hb.w_pct
+    _G._tsm_hide_rect.h = (sh - lb_off * 2) * hb.h_pct
+end
+
+local _TSM_WEBSTATE_INACTIVE = { sf6_running = true, training_active = false, mode = 0 }
+local function _tsm_dump_webstate_inactive()
+    json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", _TSM_WEBSTATE_INACTIVE)
+end
+
+local function _tsm_web_bridge_tick()
+    json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", {
+        mode = _G.CurrentTrainerMode or 0,
+        trial_file = _G.ComboTrials_CurrentFile or "",
+        trial_step = _G.ComboTrials_CurrentStep or 0,
+        trial_total = _G.ComboTrials_TotalSteps or 0,
+        trial_playing = _G.ComboTrials_IsPlaying or false,
+        trial_recording = _G.ComboTrials_IsRecording or false,
+        trial_demo = _G.ComboTrials_IsDemo or false,
+        trial_files = _G.ComboTrials_FileList or {},
+        trial_file_idx = _G.ComboTrials_FileIdx or 1,
+        trial_position = _G.ComboTrials_PositionIdx or 1,
+        is_running = _G.TrainingSession_IsRunning or false,
+        is_paused = _G.TrainingSession_IsPaused or false,
+        timer = _G.TrainingSession_Timer or 0,
+        trials = _G.TrainingSession_Trials or 0,
+        session_mode = _G.TrainingSession_Mode or 2,
+        hide_ui = _G._tsm_hide_ui or false,
+        sf6_running = true,
+        training_active = _G.TrainingModeActive or false,
+    })
+    local b = json.load_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json")
+    if b and b._web_timestamp and (not _G._tsm_bridge_ts or b._web_timestamp > _G._tsm_bridge_ts) then
+        _G._tsm_bridge_ts = b._web_timestamp
+        if not _G.TrainingModeActive then
+            b.cmd = nil
+            json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json", b)
+        end
+        if _G.TrainingModeActive and b.mode ~= nil then _G.CurrentTrainerMode = b.mode end
+        if _G.TrainingModeActive and b.cmd then
+            if b.cmd == "hide_ui" then
+                _G._tsm_hide_ui = not _G._tsm_hide_ui
+            else
+                _G._tsm_web_cmd = b.cmd
+            end
+            b.cmd = nil
+            json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json", b)
+        end
+        if _G.TrainingModeActive and b.teleport and _G._dv_teleport then
+            pcall(_G._dv_teleport, b.teleport.distance)
+            b.teleport = nil
+            json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json", b)
+        end
+    end
+end
+
 re.on_frame(function()
     SharedUI.clear_rects()
     _G.TrainingBarsDrawn = false
@@ -639,22 +714,17 @@ re.on_frame(function()
     -- HIDE UI BUTTON (fonctionne en training + replay)
     if not _G._tsm_hide_flash then _G._tsm_hide_flash = 0 end
     if not _G._tsm_hide_rect then _G._tsm_hide_rect = { x = 0, y = 0, w = 0, h = 0 } end
-    pcall(function()
-        local sw, sh = SharedUI.get_screen_size()
-        local lb_off = SharedUI.get_letterbox_offset()
-        local hb = config.hide_btn
-        _G._tsm_hide_rect.x = sw * hb.x_pct
-        _G._tsm_hide_rect.y = lb_off + (sh - lb_off * 2) * hb.y_pct
-        _G._tsm_hide_rect.w = sw * hb.w_pct
-        _G._tsm_hide_rect.h = (sh - lb_off * 2) * hb.h_pct
-    end)
-    if not _G.IsInBattleHub and imgui.is_mouse_clicked(0) then
+    pcall(_tsm_update_hide_rect)
+    if not _G._tsm_hide_cooldown then _G._tsm_hide_cooldown = 0 end
+    if _G._tsm_hide_cooldown > 0 then _G._tsm_hide_cooldown = _G._tsm_hide_cooldown - 1 end
+    if not _G.IsInBattleHub and _G._tsm_hide_cooldown == 0 and imgui.is_mouse_clicked(0) then
         local m = imgui.get_mouse()
         if m then
             local r = _G._tsm_hide_rect
             if r.w > 0 and m.x >= r.x and m.x <= r.x + r.w and m.y >= r.y and m.y <= r.y + r.h then
                 _G._tsm_hide_ui = not _G._tsm_hide_ui
                 _G._tsm_hide_flash = 10
+                _G._tsm_hide_cooldown = 3
             end
         end
     end
@@ -664,7 +734,7 @@ re.on_frame(function()
         if _G.CurrentTrainerMode ~= 0 then _G.CurrentTrainerMode = 0 end
         _G.TrainingModeActive = false
         _G.TrainingGamePaused = true
-        pcall(function() json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", { sf6_running = true, training_active = false, mode = 0 }) end)
+        pcall(_tsm_dump_webstate_inactive)
         return
     end
 
@@ -704,7 +774,7 @@ re.on_frame(function()
         end
         _G.TrainingModeActive = false
         _G.TrainingGamePaused = true
-        pcall(function() json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", { sf6_running = true, training_active = false, mode = 0 }) end)
+        pcall(_tsm_dump_webstate_inactive)
         return
     end
     _G.TrainingModeActive = true
@@ -762,6 +832,8 @@ re.on_frame(function()
     _G.TrainingGamePaused = in_pause_menu
     if not in_pause_menu and not _G._tsm_hide_ui then
         draw_top_floating_bar()
+    elseif _G._tsm_hide_ui then
+        _G.TrainingBarsDrawn = true
     end
 
 
@@ -778,51 +850,7 @@ re.on_frame(function()
     _G._tsm_web_counter = _G._tsm_web_counter + 1
     if _G._tsm_web_counter >= 30 then
         _G._tsm_web_counter = 0
-        pcall(function()
-            json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebState.json", {
-                mode = _G.CurrentTrainerMode or 0,
-                trial_file = _G.ComboTrials_CurrentFile or "",
-                trial_step = _G.ComboTrials_CurrentStep or 0,
-                trial_total = _G.ComboTrials_TotalSteps or 0,
-                trial_playing = _G.ComboTrials_IsPlaying or false,
-                trial_recording = _G.ComboTrials_IsRecording or false,
-                trial_demo = _G.ComboTrials_IsDemo or false,
-                trial_files = _G.ComboTrials_FileList or {},
-                trial_file_idx = _G.ComboTrials_FileIdx or 1,
-                trial_position = _G.ComboTrials_PositionIdx or 1,
-                is_running = _G.TrainingSession_IsRunning or false,
-                is_paused = _G.TrainingSession_IsPaused or false,
-                timer = _G.TrainingSession_Timer or 0,
-                trials = _G.TrainingSession_Trials or 0,
-                session_mode = _G.TrainingSession_Mode or 2,
-                hide_ui = _G._tsm_hide_ui or false,
-                sf6_running = true,
-                training_active = _G.TrainingModeActive or false,
-            })
-            local b = json.load_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json")
-            if b and b._web_timestamp and (not _G._tsm_bridge_ts or b._web_timestamp > _G._tsm_bridge_ts) then
-                _G._tsm_bridge_ts = b._web_timestamp
-                if not _G.TrainingModeActive then
-                    b.cmd = nil
-                    json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json", b)
-                end
-                if _G.TrainingModeActive and b.mode ~= nil then _G.CurrentTrainerMode = b.mode end
-                if _G.TrainingModeActive and b.cmd then
-                    if b.cmd == "hide_ui" then
-                        _G._tsm_hide_ui = not _G._tsm_hide_ui
-                    else
-                        _G._tsm_web_cmd = b.cmd
-                    end
-                    b.cmd = nil
-                    json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json", b)
-                end
-                if _G.TrainingModeActive and b.teleport and _G._dv_teleport then
-                    pcall(_G._dv_teleport, b.teleport.distance)
-                    b.teleport = nil
-                    json.dump_file("SF6_TrainingRemoteControl_data/TSM_WebBridge.json", b)
-                end
-            end
-        end)
+        pcall(_tsm_web_bridge_tick)
     end
 end)
 
@@ -1086,21 +1114,24 @@ end)
 
 -- Session Recap D2D overlay (draws on top of everything)
 local SessionRecap = require("func/Training_SessionRecap")
+
+local function _tsm_draw_hide_flash()
+    local r = _G._tsm_hide_rect
+    if not r or r.w <= 0 then return end
+    local flash = _G._tsm_hide_flash or 0
+    if flash > 0 then
+        _G._tsm_hide_flash = flash - 1
+        local c = _G._tsm_hide_ui and 0x99FF4444 or 0x9944FF88
+        d2d.fill_rect(r.x, r.y, r.w, r.h, c)
+        d2d.outline_rect(r.x, r.y, r.w, r.h, 2, 0xFFFFFFFF)
+    end
+end
+
 if d2d and d2d.register then
     d2d.register(function() end, function()
         if SessionRecap and SessionRecap.d2d_draw then
             SessionRecap.d2d_draw()
         end
-        pcall(function()
-            local r = _G._tsm_hide_rect
-            if not r or r.w <= 0 then return end
-            local flash = _G._tsm_hide_flash or 0
-            if flash > 0 then
-                _G._tsm_hide_flash = flash - 1
-                local c = _G._tsm_hide_ui and 0x99FF4444 or 0x9944FF88
-                d2d.fill_rect(r.x, r.y, r.w, r.h, c)
-                d2d.outline_rect(r.x, r.y, r.w, r.h, 2, 0xFFFFFFFF)
-            end
-        end)
+        pcall(_tsm_draw_hide_flash)
     end)
 end

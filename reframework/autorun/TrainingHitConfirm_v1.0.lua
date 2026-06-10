@@ -13,28 +13,33 @@ local SessionRecap = require("func/Training_SessionRecap")
 local DR_IDS = { [500]=true, [501]=true, [502]=true, [504]=true, [730]=true, [731]=true, [739]=true, [740]=true, [741]=true, [760]=true, [761]=true }
 
 local _tf_guard_cache_hc = nil
-local function hc_set_guard(guard_val)
-    pcall(function()
-        local tm = sdk.get_managed_singleton("app.training.TrainingManager")
-        if not tm then return end
-        local tData = tm:get_field("_tData")
-        local dd = tData:get_field("GuardSetting"):get_field("DummyData")
-        dd.GuardType = guard_val
-    end)
-    if not _tf_guard_cache_hc then
-        pcall(function()
-            local tm = sdk.get_managed_singleton("app.training.TrainingManager")
-            if not tm then return end
-            local entries = tm:get_field("_tfFuncs"):get_field("_entries")
-            for i = 0, entries:call("get_Count") - 1 do
-                local val = entries:call("get_Item", i):get_field("value")
-                if val and val:get_type_definition():get_full_name():find("tf_GuardSetting") then
-                    _tf_guard_cache_hc = val; return
-                end
-            end
-        end)
+local function _hc_apply_guard_type(guard_val)
+    local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+    if not tm then return end
+    local tData = tm:get_field("_tData")
+    local dd = tData:get_field("GuardSetting"):get_field("DummyData")
+    dd.GuardType = guard_val
+end
+local function _hc_find_tf_guard()
+    local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+    if not tm then return end
+    local entries = tm:get_field("_tfFuncs"):get_field("_entries")
+    for i = 0, entries:call("get_Count") - 1 do
+        local val = entries:call("get_Item", i):get_field("value")
+        if val and val:get_type_definition():get_full_name():find("tf_GuardSetting") then
+            _tf_guard_cache_hc = val; return
+        end
     end
-    if _tf_guard_cache_hc then pcall(function() _tf_guard_cache_hc:call("bApply") end) end
+end
+local function _hc_apply_tf_guard()
+    _tf_guard_cache_hc:call("bApply")
+end
+local function hc_set_guard(guard_val)
+    pcall(_hc_apply_guard_type, guard_val)
+    if not _tf_guard_cache_hc then
+        pcall(_hc_find_tf_guard)
+    end
+    if _tf_guard_cache_hc then pcall(_hc_apply_tf_guard) end
 end
 
 local guard_override = { active = false, timer = 0, duration = 40 }
@@ -223,6 +228,20 @@ local detection = {
     lockout = false
 }
 
+-- Hot-path helpers for update_detection (file-scope: no per-frame closures)
+local _td_gB_hc = sdk.find_type_definition("gBattle")
+local function _hc_get_count(list) return list:call("get_Count") end
+local function _hc_check_active(idx, buffer_count)
+    if idx < 0 or idx >= buffer_count then return false end
+    local item1 = detection.p1_list:call("get_Item", idx); local item2 = detection.p2_list:call("get_Item", idx)
+    if not item1 or not item2 then return false end
+    local ft1 = tonumber(tostring(item1:get_field("FrameType"))) or 0; local ft2 = tonumber(tostring(item2:get_field("FrameType"))) or 0
+    return (ft1 ~= 0 or ft2 ~= 0)
+end
+local function _hc_get_all(item)
+    return { ft = tonumber(tostring(item:get_field("FrameType"))) or 0, st = tonumber(tostring(item:get_field("Type"))) or 0, fn = tonumber(tostring(item:get_field("Frame"))) or 0, sf = tonumber(tostring(item:get_field("StartFrame"))) or 0, ef = tonumber(tostring(item:get_field("EndFrame"))) or 0, mg = tonumber(tostring(item:get_field("MainGauge"))) or 0 }
+end
+
 -- =========================================================
 -- 2. TOOLS & HELPERS
 -- =========================================================
@@ -337,43 +356,51 @@ end
 
 local CANCEL_BASE_GROUPS = { [0] = true, [15] = true }
 
+local function _hc_call_get_elements(obj)
+    return obj:get_elements()
+end
+local function _hc_get_items_elements(obj)
+    local items = obj:get_field("_items")
+    if items then return true, items:get_elements() end
+    return false, nil
+end
 local function get_elements_safe(obj)
     if not obj then return nil end
-    local s, arr = pcall(function() return obj:get_elements() end)
+    local s, arr = pcall(_hc_call_get_elements, obj)
     if s and arr then return arr end
-    pcall(function()
-        local items = obj:get_field("_items")
-        if items then arr = items:get_elements() end
-    end)
+    local s2, found, arr2 = pcall(_hc_get_items_elements, obj)
+    if s2 and found then arr = arr2 end
     return arr
 end
 
-local function check_p1_cancelable()
-    local cancelable = false
-    pcall(function()
-        local sP = sdk.find_type_definition("gBattle"):get_field("Player"):get_data(nil)
-        if not sP or not sP.mcPlayer or not sP.mcPlayer[0] then return end
-        local p1 = sP.mcPlayer[0]
-        local keys_obj = p1.mpActParam.ActionPart._Engine:get_field("mParam"):get_field("action"):get_field("Keys")
-        local groups = get_elements_safe(keys_obj)
-        if not groups then return end
-        for _, group in ipairs(groups) do
-            local keys = get_elements_safe(group)
-            if keys then
-                for _, key in ipairs(keys) do
-                    local td = key:get_type_definition()
-                    if td and td:get_name() == "TriggerKey" then
-                        local tg = tonumber(key:get_field("TriggerGroup") or 0)
-                        if not CANCEL_BASE_GROUPS[tg] then
-                            cancelable = true
-                            return
-                        end
+local function _hc_check_cancelable_impl()
+    local sP = sdk.find_type_definition("gBattle"):get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer or not sP.mcPlayer[0] then return false end
+    local p1 = sP.mcPlayer[0]
+    local keys_obj = p1.mpActParam.ActionPart._Engine:get_field("mParam"):get_field("action"):get_field("Keys")
+    local groups = get_elements_safe(keys_obj)
+    if not groups then return false end
+    for _, group in ipairs(groups) do
+        local keys = get_elements_safe(group)
+        if keys then
+            for _, key in ipairs(keys) do
+                local td = key:get_type_definition()
+                if td and td:get_name() == "TriggerKey" then
+                    local tg = tonumber(key:get_field("TriggerGroup") or 0)
+                    if not CANCEL_BASE_GROUPS[tg] then
+                        return true
                     end
                 end
             end
         end
-    end)
-    return cancelable
+    end
+    return false
+end
+
+local function check_p1_cancelable()
+    local ok, cancelable = pcall(_hc_check_cancelable_impl)
+    if ok and cancelable then return true end
+    return false
 end
 
 -- Keep Hardware reader ONLY for menu navigation shortcuts
@@ -496,6 +523,36 @@ local function update_history_status(clock_time, status_txt)
     local entry = session.history_map[clock_time]; if entry then entry.status = status_txt end
 end
 
+local function _hc_read_frame_adv()
+    local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+    if not tm then return nil end
+    local tc = tm:get_field("_tCommon")
+    if not tc then return nil end
+    local snap = tc:get_field("SnapShotDatas")
+    if not snap then return nil end
+    local s0 = snap[0]
+    if not s0 then return nil end
+    local dd = s0:get_field("_DisplayData")
+    if not dd then return nil end
+    local fm = dd:get_field("FrameMeterSSData")
+    if not fm then return nil end
+    local md = fm:get_field("MeterDatas")
+    if not md then return nil end
+    local m0 = md:call("get_Item", 0)
+    if m0 then
+        local sf = m0:get_field("StunFrame")
+        if sf then
+            local num = tonumber(tostring(sf))
+            if num then return num
+            else
+                local extracted = tostring(sf):match("([%-]?%d+)")
+                if extracted then return tonumber(extracted) or 99 end
+            end
+        end
+    end
+    return nil
+end
+
 local function update_detection()
     if session.is_paused or session.is_time_up then return end
     if session.is_paused then return end
@@ -504,12 +561,12 @@ local function update_detection()
     if detection.mem_res == nil then detection.mem_res = {} end
     if detection.mem_dmg == nil then detection.mem_dmg = {} end
     if detection.mem_hs  == nil then detection.mem_hs  = {} end
-    detection.active_lines = {}; detection.live_dmg = 0; detection.live_hs = 0; detection.live_combo = 0
+    detection.live_dmg = 0; detection.live_hs = 0; detection.live_combo = 0
     
-    local gBattle = sdk.find_type_definition("gBattle")
+    local gBattle = _td_gB_hc
     if gBattle then
         local p2_obj = gBattle:get_field("Player"):get_data(nil):call("getPlayer", 1)
-        if p2_obj then 
+        if p2_obj then
             local dt = p2_obj:get_field("damage_type"); if dt then detection.live_dmg = tonumber(tostring(dt)) or 0 end
             local hs = p2_obj:get_field("hit_stop"); if hs then detection.live_hs = tonumber(tostring(hs)) or 0 end
         end
@@ -519,53 +576,70 @@ local function update_detection()
         end
     end
 
-    local mgr = sdk.get_managed_singleton("app.training.TrainingManager")
-    if not mgr then return end
-    local dict = mgr:get_field("_ViewUIWigetDict"); local entries = dict and dict:get_field("_entries")
-    if not entries then return end
+    -- Frame meter widget lookup: cached, refreshed when missing or every 300 frames
+    detection._list_refresh = (detection._list_refresh or 0) - 1
+    if detection._list_refresh <= 0 or not detection.p1_list or not detection.p2_list then
+        detection._list_refresh = 300
+        detection.p1_list = nil; detection.p2_list = nil
+        local mgr = sdk.get_managed_singleton("app.training.TrainingManager")
+        if not mgr then return end
+        local dict = mgr:get_field("_ViewUIWigetDict"); local entries = dict and dict:get_field("_entries")
+        if not entries then return end
 
-    local count = entries:call("get_Count")
-    for i = 0, count - 1 do
-        local entry = entries:call("get_Item", i)
-        if entry:get_field("key") == 5 then 
-            local widget = entry:get_field("value"):call("get_Item", 0)
-            local ss = widget:call("get_SSData"); local m_datas = ss:get_field("MeterDatas")
-            if m_datas and m_datas:call("get_Count") >= 2 then
-                local item_p1 = m_datas:call("get_Item", 0); local item_p2 = m_datas:call("get_Item", 1)
-                if item_p1 then detection.p1_list = item_p1:get_field("FrameNumDatas") end
-                if item_p2 then detection.p2_list = item_p2:get_field("FrameNumDatas") end
+        local count = entries:call("get_Count")
+        for i = 0, count - 1 do
+            local entry = entries:call("get_Item", i)
+            if entry:get_field("key") == 5 then
+                local widget = entry:get_field("value"):call("get_Item", 0)
+                local ss = widget:call("get_SSData"); local m_datas = ss:get_field("MeterDatas")
+                if m_datas and m_datas:call("get_Count") >= 2 then
+                    local item_p1 = m_datas:call("get_Item", 0); local item_p2 = m_datas:call("get_Item", 1)
+                    if item_p1 then detection.p1_list = item_p1:get_field("FrameNumDatas") end
+                    if item_p2 then detection.p2_list = item_p2:get_field("FrameNumDatas") end
+                end
+                break
             end
-            break
         end
     end
 
     if detection.p1_list and detection.p2_list then
-        local buffer_count = detection.p1_list:call("get_Count")
-        if buffer_count <= 0 then return end
-        detection.buffer_capacity = buffer_count 
+        local ok_cnt, buffer_count = pcall(_hc_get_count, detection.p1_list)
+        if not ok_cnt then detection.p1_list = nil; detection.p2_list = nil; return end
+        if not buffer_count or buffer_count <= 0 then return end
+        detection.buffer_capacity = buffer_count
         
         local active_head_index = -1; local next_idx = (detection.last_head_index + 1) % buffer_count
-        local function check_active(idx)
-            if idx < 0 or idx >= buffer_count then return false end
-            local item1 = detection.p1_list:call("get_Item", idx); local item2 = detection.p2_list:call("get_Item", idx)
-            if not item1 or not item2 then return false end
-            local ft1 = tonumber(tostring(item1:get_field("FrameType"))) or 0; local ft2 = tonumber(tostring(item2:get_field("FrameType"))) or 0
-            return (ft1 ~= 0 or ft2 ~= 0)
-        end
 
         local is_new_frame = false
-        if check_active(next_idx) then active_head_index = next_idx; detection.abs_clock = detection.abs_clock + 1; is_new_frame = true
-        elseif check_active(detection.last_head_index) then active_head_index = detection.last_head_index
-        else detection.mem_hit = {}; detection.mem_blk = {}; detection.mem_res = {}; detection.mem_dmg = {}; detection.mem_hs = {}; detection.monitor.active = false; detection.abs_clock = 0; for i = buffer_count - 1, 0, -1 do if check_active(i) then active_head_index = i; break end end end
+        if _hc_check_active(next_idx, buffer_count) then active_head_index = next_idx; detection.abs_clock = detection.abs_clock + 1; is_new_frame = true
+        elseif _hc_check_active(detection.last_head_index, buffer_count) then active_head_index = detection.last_head_index
+        else
+            -- Idle: the old full-buffer backward rescan cost ~3ms per pass (2 get_Item
+            -- + 2 get_field + 2 tostring per entry). Replaced by a bounded rotating
+            -- scan: max 20 entries per frame, resumes where it left off. Normal
+            -- resumption is caught instantly by the next_idx check above.
+            if not detection._idle_mode then
+                detection._idle_mode = true
+                detection._idle_scan_i = buffer_count - 1
+                detection.mem_hit = {}; detection.mem_blk = {}; detection.mem_res = {}; detection.mem_dmg = {}; detection.mem_hs = {}; detection.monitor.active = false; detection.abs_clock = 0
+            end
+            local i = detection._idle_scan_i or (buffer_count - 1)
+            local checked = 0
+            while i >= 0 and checked < 20 do
+                if _hc_check_active(i, buffer_count) then active_head_index = i; break end
+                i = i - 1; checked = checked + 1
+            end
+            if active_head_index == -1 then
+                detection._idle_scan_i = (i >= 0) and i or (buffer_count - 1)
+            end
+        end
+        if active_head_index ~= -1 then detection._idle_mode = false end
         detection.last_head_index = active_head_index
 
         if active_head_index ~= -1 and detection.p1_list then
             local it1 = detection.p1_list:call("get_Item", active_head_index); local it2 = detection.p2_list:call("get_Item", active_head_index)
             if it1 and it2 then
-                local function get_all(item)
-                    return { ft = tonumber(tostring(item:get_field("FrameType"))) or 0, st = tonumber(tostring(item:get_field("Type"))) or 0, fn = tonumber(tostring(item:get_field("Frame"))) or 0, sf = tonumber(tostring(item:get_field("StartFrame"))) or 0, ef = tonumber(tostring(item:get_field("EndFrame"))) or 0, mg = tonumber(tostring(item:get_field("MainGauge"))) or 0 }
-                end
-                local p1_data = get_all(it1); local p2_data = get_all(it2)
+                local p1_data = _hc_get_all(it1); local p2_data = _hc_get_all(it2)
                 
                 if is_new_frame and session.is_logging then
                     local entry = { clock = detection.abs_clock, p1 = p1_data, p2 = p2_data, dmg = detection.live_dmg, hs = detection.live_hs, cmb = detection.live_combo, status = "", tag = nil }
@@ -842,34 +916,8 @@ local function update_detection()
                             elseif detection.live_combo == 0 then
                                 -- Check si le coup doit être ignoré (pas cancelable ET advantage < 4)
                                 local frame_adv = 99
-                                pcall(function()
-                                    local tm = sdk.get_managed_singleton("app.training.TrainingManager")
-                                    if not tm then return end
-                                    local tc = tm:get_field("_tCommon")
-                                    if not tc then return end
-                                    local snap = tc:get_field("SnapShotDatas")
-                                    if not snap then return end
-                                    local s0 = snap[0]
-                                    if not s0 then return end
-                                    local dd = s0:get_field("_DisplayData")
-                                    if not dd then return end
-                                    local fm = dd:get_field("FrameMeterSSData")
-                                    if not fm then return end
-                                    local md = fm:get_field("MeterDatas")
-                                    if not md then return end
-                                    local m0 = md:call("get_Item", 0)
-                                    if m0 then
-                                        local sf = m0:get_field("StunFrame")
-                                        if sf then
-                                            local num = tonumber(tostring(sf))
-                                            if num then frame_adv = num
-                                            else
-                                                local extracted = tostring(sf):match("([%-]?%d+)")
-                                                if extracted then frame_adv = tonumber(extracted) or 99 end
-                                            end
-                                        end
-                                    end
-                                end)
+                                local fa_ok, fa_val = pcall(_hc_read_frame_adv)
+                                if fa_ok and fa_val then frame_adv = fa_val end
                                 local did_confirm = (detection.monitor.peak_combo and detection.monitor.peak_combo >= detection.monitor.target_combo) or detection.monitor.saw_new_action or detection.monitor.saw_recovery_to_startup
                                     local fail_txt = did_confirm and TEXTS.fail_combo_drop or TEXTS.fail_drop
                                     detection.mem_res[active_head_index] = { status = fail_txt, time = detection.abs_clock }; update_history_status(detection.abs_clock, fail_txt)
@@ -912,6 +960,7 @@ local function update_detection()
     end
 
     if user_config.show_matrix_debug and detection.p1_list and detection.p2_list then
+        detection.active_lines = {}
         local cnt1 = detection.p1_list:call("get_Count"); local cnt2 = detection.p2_list:call("get_Count")
         local max_cnt = math.max(cnt1, cnt2); local limit = 0
         for idx = 0, max_cnt - 1 do
@@ -1024,6 +1073,8 @@ local last_kb_state = { [0x31]=false, [0x32]=false, [0x33]=false, [0x34]=false }
 
 local function hc_ticker(msg) if _G.show_custom_ticker then _G.show_custom_ticker(msg, 0.3) end end
 
+local function _hc_is_key_down(k) return reframework:is_key_down(k) end
+
 local function apply_difficulty(val)
     user_config.difficulty = val
     if val == 1 then user_config.show_early_detection = true; user_config.dont_count_blocked = false 
@@ -1045,7 +1096,7 @@ local function handle_input()
 
     local kb_state = {}
     for _, k in ipairs({0x31, 0x32, 0x33, 0x34}) do
-        local ok, down = pcall(function() return reframework:is_key_down(k) end)
+        local ok, down = pcall(_hc_is_key_down, k)
         kb_state[k] = ok and down
     end
     local function kb_pressed(k) return kb_state[k] and not last_kb_state[k] end

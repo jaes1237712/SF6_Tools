@@ -37,12 +37,17 @@ UI.HUD_CONFIG = {
     ["_07"]     = { font = "sf6_college.otf", size = 65, y = -0.451, x = 0.0 }  -- SIMSIM	: OK
 }
 
+local function _sui_read_display_xy(result)
+    return result.x, result.y
+end
+
 function UI.get_screen_size()
     local w, h = 1920, 1080
     if imgui.get_display_size then
         local result = imgui.get_display_size()
         if type(result) == "userdata" then
-            pcall(function() w, h = result.x, result.y end)
+            local ok, rx, ry = pcall(_sui_read_display_xy, result)
+            if ok then w, h = rx, ry end
         elseif type(result) == "number" then
             w, h = imgui.get_display_size()
         end
@@ -231,13 +236,15 @@ end
 -- ==========================================
 -- DYNAMIC SHORTCUT LABEL (pad vs keyboard)
 -- ==========================================
+local function _sui_read_keyboard_mode()
+    local igm = sdk.get_managed_singleton("app.InputGuideManager")
+    if igm then return igm:call("GetMode", 0) == 2 end
+    return false
+end
+
 local function is_keyboard_mode()
-    local kb = false
-    pcall(function()
-        local igm = sdk.get_managed_singleton("app.InputGuideManager")
-        if igm then kb = (igm:call("GetMode", 0) == 2) end
-    end)
-    return kb
+    local ok, kb = pcall(_sui_read_keyboard_mode)
+    return (ok and kb) or false
 end
 UI.is_keyboard_mode = is_keyboard_mode
 
@@ -409,7 +416,9 @@ function UI.begin_floating_window_top(window_name, width_pct, height_pct)
     local real_w, real_h = sw, sh
     if imgui.get_display_size then
         local result = imgui.get_display_size()
-        if type(result) == "userdata" then pcall(function() real_w, real_h = result.x, result.y end)
+        if type(result) == "userdata" then
+            local ok, rx, ry = pcall(_sui_read_display_xy, result)
+            if ok then real_w, real_h = rx, ry end
         elseif type(result) == "number" then real_w, real_h = imgui.get_display_size() end
     end
     local target_w = real_w * width_pct

@@ -275,6 +275,12 @@ end
 -- D2D: SHARED HEADER + CLOSE BUTTON
 -- =========================================================
 
+local function _rec_get_mouse_xy()
+    local m = imgui.get_mouse()
+    if m then return m.x, m.y end
+    return nil
+end
+
 local function draw_header(panel_x, panel_y, panel_w, header_h, fh, pad)
     -- Header background
     d2d.fill_rect(panel_x, panel_y, panel_w, header_h, COL_HEADER_BG)
@@ -302,13 +308,11 @@ local function draw_header(panel_x, panel_y, panel_w, header_h, fh, pad)
     _close_btn.h = btn_size
 
     local is_hovered = false
-    pcall(function()
-        local m = imgui.get_mouse()
-        if m then
-            is_hovered = m.x >= btn_x and m.x <= btn_x + btn_size
-                     and m.y >= btn_y and m.y <= btn_y + btn_size
-        end
-    end)
+    local mok, hmx, hmy = pcall(_rec_get_mouse_xy)
+    if mok and hmx then
+        is_hovered = hmx >= btn_x and hmx <= btn_x + btn_size
+                 and hmy >= btn_y and hmy <= btn_y + btn_size
+    end
 
     d2d.fill_rect(btn_x, btn_y, btn_size, btn_size, is_hovered and COL_CLOSE_HOV or COL_CLOSE_BG)
     d2d.outline_rect(btn_x, btn_y, btn_size, btn_size, 1, COL_ACCENT)
@@ -323,6 +327,41 @@ end
 -- =========================================================
 -- D2D: BAR CHART (Reactions / PostGuard)
 -- =========================================================
+
+local function _rec_draw_bar_row(i, s, content_y, row_h, bar_h, fh_s, panel_x, panel_w, content_x, bar_x, bar_max_w, pct_x, score_x)
+    local ry  = content_y + (i - 1) * row_h
+    local by  = ry + (row_h - bar_h) * 0.5
+    local tty = ry + (row_h - fh_s) * 0.5
+
+    -- Alternating row bg
+    if i % 2 == 0 then
+        d2d.fill_rect(panel_x + 1, ry, panel_w - 2, row_h, 0x0CFFFFFF)
+    end
+
+    -- Date
+    d2d.text(_font_small, tostring(s.date or "?"), content_x + 1, tty + 1, COL_SHADOW)
+    d2d.text(_font_small, tostring(s.date or "?"), content_x, tty, COL_TEXT_DIM)
+
+    -- Bar
+    d2d.fill_rect(bar_x, by, bar_max_w, bar_h, COL_BAR_BG)
+    local pct_safe = tonumber(s.pct) or 0
+    local fill_w = bar_max_w * math.min(pct_safe, 100) / 100
+    local col = bar_color(pct_safe)
+    d2d.fill_rect(bar_x, by, fill_w, bar_h, col)
+    d2d.outline_rect(bar_x, by, bar_max_w, bar_h, 1, COL_ACCENT)
+
+    -- Percentage
+    local pct_str = string.format("%d%%", math.floor(pct_safe))
+    d2d.text(_font_small, pct_str, pct_x + 1, tty + 1, COL_SHADOW)
+    d2d.text(_font_small, pct_str, pct_x, tty, col)
+
+    -- Score
+    local sc_str = string.format("%d/%d", tonumber(s.score) or 0, tonumber(s.total) or 0)
+    d2d.text(_font_small, sc_str, score_x + 1, tty + 1, COL_SHADOW)
+    d2d.text(_font_small, sc_str, score_x, tty, COL_TEXT)
+
+    return pct_safe
+end
 
 local function draw_bars(sw, sh, fh, fh_s)
     local n        = #_sessions
@@ -355,40 +394,8 @@ local function draw_bars(sw, sh, fh, fh_s)
     local sum_pct   = 0
 
     for i, s in ipairs(_sessions) do
-        pcall(function()
-            local ry  = content_y + (i - 1) * row_h
-            local by  = ry + (row_h - bar_h) * 0.5
-            local tty = ry + (row_h - fh_s) * 0.5
-
-            -- Alternating row bg
-            if i % 2 == 0 then
-                d2d.fill_rect(panel_x + 1, ry, panel_w - 2, row_h, 0x0CFFFFFF)
-            end
-
-            -- Date
-            d2d.text(_font_small, tostring(s.date or "?"), content_x + 1, tty + 1, COL_SHADOW)
-            d2d.text(_font_small, tostring(s.date or "?"), content_x, tty, COL_TEXT_DIM)
-
-            -- Bar
-            d2d.fill_rect(bar_x, by, bar_max_w, bar_h, COL_BAR_BG)
-            local pct_safe = tonumber(s.pct) or 0
-            local fill_w = bar_max_w * math.min(pct_safe, 100) / 100
-            local col = bar_color(pct_safe)
-            d2d.fill_rect(bar_x, by, fill_w, bar_h, col)
-            d2d.outline_rect(bar_x, by, bar_max_w, bar_h, 1, COL_ACCENT)
-
-            -- Percentage
-            local pct_str = string.format("%d%%", math.floor(pct_safe))
-            d2d.text(_font_small, pct_str, pct_x + 1, tty + 1, COL_SHADOW)
-            d2d.text(_font_small, pct_str, pct_x, tty, col)
-
-            -- Score
-            local sc_str = string.format("%d/%d", tonumber(s.score) or 0, tonumber(s.total) or 0)
-            d2d.text(_font_small, sc_str, score_x + 1, tty + 1, COL_SHADOW)
-            d2d.text(_font_small, sc_str, score_x, tty, COL_TEXT)
-
-            sum_pct = sum_pct + pct_safe
-        end)
+        local ok, pct_add = pcall(_rec_draw_bar_row, i, s, content_y, row_h, bar_h, fh_s, panel_x, panel_w, content_x, bar_x, bar_max_w, pct_x, score_x)
+        if ok and pct_add then sum_pct = sum_pct + pct_add end
     end
 
     -- Footer separator + content
@@ -419,6 +426,67 @@ end
 -- =========================================================
 
 local COL_SINGLE    = 0xFF44DDFF  -- bright cyan for single-curve mode
+
+local function _rec_fill_area_seg(i, c, sx, sy, cy, ch)
+    local v = tonumber(_sessions[i][c.key]) or 0
+    local vp = tonumber(_sessions[i-1][c.key]) or 0
+    local x1, x2 = sx(i-1), sx(i)
+    local y1, y2 = sy(vp), sy(v)
+    local base = cy + ch
+    local steps = math.max(1, math.floor(x2 - x1))
+    for s = 0, steps do
+        local t = s / steps
+        local lx = x1 + (x2 - x1) * t
+        local ly = y1 + (y2 - y1) * t
+        d2d.fill_rect(lx, ly, 1, base - ly, c.fill)
+    end
+end
+
+local function _rec_draw_point(i, c, sx, sy, mx, my, hover_r, dot_r, want_tooltip)
+    local v = tonumber(_sessions[i][c.key]) or 0
+    if i > 1 then
+        local vp = tonumber(_sessions[i-1][c.key]) or 0
+        draw_line(sx(i-1), sy(vp), sx(i), sy(v), 2, c.color)
+    end
+    local px, py = sx(i), sy(v)
+    local is_hov = math.abs(mx - px) < hover_r and math.abs(my - py) < hover_r
+    local size = is_hov and dot_r * 1.8 or dot_r
+    d2d.fill_rect(px - size - 1, py - size - 1, size * 2 + 2, size * 2 + 2, COL_CHART_BG)
+    d2d.fill_rect(px - size, py - size, size * 2, size * 2, c.color)
+    if is_hov and want_tooltip then
+        local s = _sessions[i]
+        return { x = px, y = py, text = string.format("%s: %.1f%%", c.label, v), text2 = string.format("%d / %d", tonumber(s[c.ok_key]) or 0, tonumber(s[c.tot_key]) or 0), color = c.color }
+    end
+    return nil
+end
+
+local function _rec_draw_xlabel(i, sx, cy, ch, pad, xl_ox, xl_oy, cw_char, fh_s)
+    local s = _sessions[i]
+    local date_lbl = s.date or ""
+    local time_lbl = s.time or tostring(i)
+    local base_y = cy + ch + pad * 0.8 + xl_oy
+    local xi = sx(i) + xl_ox
+
+    -- Tick mark
+    d2d.fill_rect(xi, cy + ch, 1, pad * 0.5, COL_ACCENT)
+
+    -- Date
+    d2d.text(_font_small, date_lbl, xi - #date_lbl * cw_char * 0.5, base_y, COL_TEXT_DIM)
+
+    -- Time
+    d2d.text(_font_small, time_lbl, xi - #time_lbl * cw_char * 0.5, base_y + fh_s * 1.15, COL_TEXT)
+
+    -- Mode tag
+    local mode_raw = s.mode or ""
+    local mode_tag = ""
+    local t_count = mode_raw:match("TRIALS_(%d+)")
+    local t_min = mode_raw:match("TIMED_(%d+M)")
+    if t_count then mode_tag = "T" .. t_count
+    elseif t_min then mode_tag = t_min end
+    if mode_tag ~= "" then
+        d2d.text(_font_small, mode_tag, xi - #mode_tag * cw_char * 0.5, base_y + fh_s * 2.3, COL_TEXT_DIM)
+    end
+end
 
 local function draw_chart(sw, sh, fh, fh_s)
     local n        = #_sessions
@@ -493,10 +561,8 @@ local function draw_chart(sw, sh, fh, fh_s)
     local tooltip = nil
 
     local mx, my = 0, 0
-    pcall(function()
-        local m = imgui.get_mouse()
-        if m then mx, my = m.x, m.y end
-    end)
+    local mok, gmx, gmy = pcall(_rec_get_mouse_xy)
+    if mok and gmx then mx, my = gmx, gmy end
 
     -- Define curve data: dual mode (hit+blk) or single mode (pct)
     local curves = {}
@@ -510,42 +576,15 @@ local function draw_chart(sw, sh, fh, fh_s)
     -- Area fill under curves
     for _, c in ipairs(curves) do
         for i = 2, n do
-            pcall(function()
-                local v = tonumber(_sessions[i][c.key]) or 0
-                local vp = tonumber(_sessions[i-1][c.key]) or 0
-                local x1, x2 = sx(i-1), sx(i)
-                local y1, y2 = sy(vp), sy(v)
-                local base = cy + ch
-                local steps = math.max(1, math.floor(x2 - x1))
-                for s = 0, steps do
-                    local t = s / steps
-                    local lx = x1 + (x2 - x1) * t
-                    local ly = y1 + (y2 - y1) * t
-                    d2d.fill_rect(lx, ly, 1, base - ly, c.fill)
-                end
-            end)
+            pcall(_rec_fill_area_seg, i, c, sx, sy, cy, ch)
         end
     end
 
     -- Lines + dots
     for ci, c in ipairs(curves) do
         for i = 1, n do
-            pcall(function()
-                local v = tonumber(_sessions[i][c.key]) or 0
-                if i > 1 then
-                    local vp = tonumber(_sessions[i-1][c.key]) or 0
-                    draw_line(sx(i-1), sy(vp), sx(i), sy(v), 2, c.color)
-                end
-                local px, py = sx(i), sy(v)
-                local is_hov = math.abs(mx - px) < hover_r and math.abs(my - py) < hover_r
-                local size = is_hov and dot_r * 1.8 or dot_r
-                d2d.fill_rect(px - size - 1, py - size - 1, size * 2 + 2, size * 2 + 2, COL_CHART_BG)
-                d2d.fill_rect(px - size, py - size, size * 2, size * 2, c.color)
-                if is_hov and not tooltip then
-                    local s = _sessions[i]
-                    tooltip = { x = px, y = py, text = string.format("%s: %.1f%%", c.label, v), text2 = string.format("%d / %d", tonumber(s[c.ok_key]) or 0, tonumber(s[c.tot_key]) or 0), color = c.color }
-                end
-            end)
+            local ok, tip = pcall(_rec_draw_point, i, c, sx, sy, mx, my, hover_r, dot_r, not tooltip)
+            if ok and tip then tooltip = tip end
         end
     end
 
@@ -578,33 +617,7 @@ local function draw_chart(sw, sh, fh, fh_s)
     local xl_ox = sw * (L.xlabels_ox or 0)
     local xl_oy = sh * (L.xlabels_oy or 0)
     for i = 1, n do
-        pcall(function()
-            local s = _sessions[i]
-            local date_lbl = s.date or ""
-            local time_lbl = s.time or tostring(i)
-            local base_y = cy + ch + pad * 0.8 + xl_oy
-            local xi = sx(i) + xl_ox
-
-            -- Tick mark
-            d2d.fill_rect(xi, cy + ch, 1, pad * 0.5, COL_ACCENT)
-
-            -- Date
-            d2d.text(_font_small, date_lbl, xi - #date_lbl * cw_char * 0.5, base_y, COL_TEXT_DIM)
-
-            -- Time
-            d2d.text(_font_small, time_lbl, xi - #time_lbl * cw_char * 0.5, base_y + fh_s * 1.15, COL_TEXT)
-
-            -- Mode tag
-            local mode_raw = s.mode or ""
-            local mode_tag = ""
-            local t_count = mode_raw:match("TRIALS_(%d+)")
-            local t_min = mode_raw:match("TIMED_(%d+M)")
-            if t_count then mode_tag = "T" .. t_count
-            elseif t_min then mode_tag = t_min end
-            if mode_tag ~= "" then
-                d2d.text(_font_small, mode_tag, xi - #mode_tag * cw_char * 0.5, base_y + fh_s * 2.3, COL_TEXT_DIM)
-            end
-        end)
+        pcall(_rec_draw_xlabel, i, sx, cy, ch, pad, xl_ox, xl_oy, cw_char, fh_s)
     end
 
     -- Legend — centered symmetrically, adapts to number of curves
@@ -692,6 +705,16 @@ end
 
 local function d2d_init() end
 
+local function _rec_check_pause_hide()
+    local pm = sdk.get_managed_singleton("app.PauseManager")
+    if pm then
+        local pb = pm:get_field("_CurrentPauseTypeBit")
+        if pb and pb ~= 64 and pb ~= 2112 then
+            _G.SessionRecapVisible = false
+        end
+    end
+end
+
 local function d2d_draw()
     local active = _G._session_recap_queue
     _G._session_recap_queue = nil
@@ -702,16 +725,7 @@ local function d2d_draw()
 
     -- Hide during pause menus
     if _visible then
-        pcall(function()
-            local pm = sdk.get_managed_singleton("app.PauseManager")
-            if pm then
-                local pb = pm:get_field("_CurrentPauseTypeBit")
-                if pb and pb ~= 64 and pb ~= 2112 then
-                    _G.SessionRecapVisible = false
-                    return
-                end
-            end
-        end)
+        pcall(_rec_check_pause_hide)
     end
 
     if not _G.SessionRecapVisible then return end
@@ -744,23 +758,25 @@ M.d2d_draw = d2d_draw
 -- to ensure it renders on top of all other D2D (including SheldonsBoxes)
 
 -- Click detection
+local function _rec_check_close_click()
+    if imgui.is_mouse_clicked(0) then
+        local m = imgui.get_mouse()
+        if m then
+            local b = _close_btn
+            if b.w > 0 and m.x >= b.x and m.x <= b.x + b.w and m.y >= b.y and m.y <= b.y + b.h then
+                M.hide()
+            end
+        end
+    end
+end
+
 re.on_frame(function()
     if not _visible then
         _G._session_recap_queue = nil
         return
     end
     _G._session_recap_queue = true
-    pcall(function()
-        if imgui.is_mouse_clicked(0) then
-            local m = imgui.get_mouse()
-            if m then
-                local b = _close_btn
-                if b.w > 0 and m.x >= b.x and m.x <= b.x + b.w and m.y >= b.y and m.y <= b.y + b.h then
-                    M.hide()
-                end
-            end
-        end
-    end)
+    pcall(_rec_check_close_click)
 end)
 
 -- Debug

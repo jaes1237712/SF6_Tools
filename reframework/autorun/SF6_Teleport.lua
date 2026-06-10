@@ -47,6 +47,11 @@ local function get_front_edge_offset(player, is_on_left)
     return best_offset * 100.0
 end
 
+local function _tp_update_fronts(p1, p2, p1_is_left)
+    p1_front = get_front_edge_offset(p1, p1_is_left)
+    p2_front = get_front_edge_offset(p2, not p1_is_left)
+end
+
 local function apply_teleport_exact(distance, is_retry)
     local gb = sdk.find_type_definition("gBattle")
     if not gb then return end
@@ -131,10 +136,7 @@ re.on_frame(function()
     local p1_is_left = p1_x < p2_x
 
     local cc = math.abs(p1_x - p2_x)
-    pcall(function()
-        p1_front = get_front_edge_offset(p1, p1_is_left)
-        p2_front = get_front_edge_offset(p2, not p1_is_left)
-    end)
+    pcall(_tp_update_fronts, p1, p2, p1_is_left)
     distances.cc = cc
     distances.bc = cc - p1_front
     distances.cb = cc - p2_front

@@ -796,12 +796,15 @@ end
 -- =========================================================
 -- sf6_menu_state is received from ctx in init()
 
+local function _ctui_get_x(v) return v.x end
+local function _ctui_get_y(v) return v.y end
+
 local function get_imgui_screen_size()
     local result = imgui.get_display_size()
     local w, h = 0, 0
     if type(result) == "userdata" then
-        local ok, x = pcall(function() return result.x end)
-        local ok2, y = pcall(function() return result.y end)
+        local ok, x = pcall(_ctui_get_x, result)
+        local ok2, y = pcall(_ctui_get_y, result)
         if ok and ok2 then
             w = x; h = y
         else
@@ -820,18 +823,21 @@ local res_cooldown = 0
 local force_float_resize = 0
 
 local _was_bars_drawn = true
+
+local function _ctui_flush_trial_display()
+    local ts = ctx and ctx.trial_state
+    if ts then
+        ts.is_playing = false
+        ts.sequence = {}
+        ts.current_step = 1
+    end
+end
+
 re.on_frame(function()
     -- Detect return from ranked: flush combo display
     local bars_now = _G.TrainingBarsDrawn
     if bars_now and not _was_bars_drawn then
-        pcall(function()
-            local ts = ctx and ctx.trial_state
-            if ts then
-                ts.is_playing = false
-                ts.sequence = {}
-                ts.current_step = 1
-            end
-        end)
+        pcall(_ctui_flush_trial_display)
     end
     _was_bars_drawn = bars_now
 
@@ -1028,11 +1034,6 @@ re.on_frame(function()
     if show_trial_overlay and is_game_active then
         sf6_menu_state.active = true
 
-        if _G._tsm_hide_ui then
-            _G.TrainingBarsDrawn = true
-            return
-        end
-
         -- Collapse toggle (replay only)
         local is_replay_ctx = (_G.IsInReplay == true) or (_G.IsInBattleHub == true)
         if _G._ct_bar_collapsed == nil then _G._ct_bar_collapsed = false end
@@ -1050,7 +1051,8 @@ re.on_frame(function()
             _G._ct_bar_geometry = nil
         end
 
-        if _G._ct_bar_collapsed and is_replay_ctx then
+        if _G._tsm_hide_ui or (_G._ct_bar_collapsed and is_replay_ctx) then
+            _G.TrainingBarsDrawn = true
             sf6_menu_state.active = false
             return
         end
@@ -1161,8 +1163,8 @@ re.on_frame(function()
                 imgui.set_cursor_pos(Vector2f.new(cb_x - 15, 0))
                 imgui.push_style_color(7, 0xFF58002C)
                 local mask_size = Vector2f.new(w_width, header_box_h)
-                if not pcall(function() imgui.progress_bar(0.0, mask_size) end) then
-                    pcall(function() imgui.progress_bar(0.0, mask_size, "") end)
+                if not pcall(imgui.progress_bar, 0.0, mask_size) then
+                    pcall(imgui.progress_bar, 0.0, mask_size, "")
                 end
                 imgui.pop_style_color(1)
 
@@ -1199,6 +1201,19 @@ end)
 -- =========================================================
 -- DESSIN DU MENU UI GLOBAL
 -- =========================================================
+local function _ctui_draw_live_positions()
+    local gB = sdk.find_type_definition("gBattle")
+    if not gB then return end
+    local sP = gB:get_field("Player"):get_data(nil)
+    if not sP or not sP.mcPlayer then return end
+    local p1x = sP.mcPlayer[0].pos.x.v or 0
+    local p2x = sP.mcPlayer[1].pos.x.v or 0
+    imgui.indent(20)
+    imgui.text(string.format("P1: %d  (%.2f cm)", p1x, p1x / 65536.0))
+    imgui.text(string.format("P2: %d  (%.2f cm)", p2x, p2x / 65536.0))
+    imgui.unindent(20)
+end
+
 local function draw_combo_trials_menu_ui()
     if _G.CurrentTrainerMode ~= 4 then return end
     if imgui.tree_node("TRAINING COMBO TRIALS") then
@@ -1929,18 +1944,7 @@ local function draw_combo_trials_menu_ui()
 
             -- LIVE POSITIONS
             imgui.text_colored("Live Positions (raw sfix):", 0xFF00FFFF)
-            pcall(function()
-                local gB = sdk.find_type_definition("gBattle")
-                if not gB then return end
-                local sP = gB:get_field("Player"):get_data(nil)
-                if not sP or not sP.mcPlayer then return end
-                local p1x = sP.mcPlayer[0].pos.x.v or 0
-                local p2x = sP.mcPlayer[1].pos.x.v or 0
-                imgui.indent(20)
-                imgui.text(string.format("P1: %d  (%.2f cm)", p1x, p1x / 65536.0))
-                imgui.text(string.format("P2: %d  (%.2f cm)", p2x, p2x / 65536.0))
-                imgui.unindent(20)
-            end)
+            pcall(_ctui_draw_live_positions)
             imgui.text_colored("Saved Trial Positions:", 0xFF00FFFF)
             imgui.indent(20)
             imgui.text(string.format("start_pos_p1_raw: %s", tostring(trial_state.start_pos_p1_raw)))

@@ -92,18 +92,20 @@ local function raw_update_history(history, d, b, max_size)
     end
 end
 
+local function _ctd_raw_read_inputs_inner(p_idx, history, max_size)
+    local gBattle = sdk.find_type_definition("gBattle")
+    if not gBattle then return end
+    local mgr = gBattle:get_field("Player"):get_data(nil)
+    if not mgr then return end
+    local p = mgr:call("getPlayer", p_idx)
+    if not p then return end
+    local d = p:get_type_definition():get_field("pl_input_new"):get_data(p) or 0
+    local b = p:get_type_definition():get_field("pl_sw_new"):get_data(p) or 0
+    raw_update_history(history, d, b, max_size)
+end
+
 local function raw_read_inputs(p_idx, history, max_size)
-    pcall(function()
-        local gBattle = sdk.find_type_definition("gBattle")
-        if not gBattle then return end
-        local mgr = gBattle:get_field("Player"):get_data(nil)
-        if not mgr then return end
-        local p = mgr:call("getPlayer", p_idx)
-        if not p then return end
-        local d = p:get_type_definition():get_field("pl_input_new"):get_data(p) or 0
-        local b = p:get_type_definition():get_field("pl_sw_new"):get_data(p) or 0
-        raw_update_history(history, d, b, max_size)
-    end)
+    pcall(_ctd_raw_read_inputs_inner, p_idx, history, max_size)
 end
 
 -- Helper: apply mirror transform to position and flip

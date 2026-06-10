@@ -318,36 +318,38 @@ local function get_p1_action_id()
 end
 
 -- MEMORY SCANNER
-local function update_real_slot_info()
-    local status, err = pcall(function()
-        local mgr = sdk.get_managed_singleton("app.training.TrainingManager")
-        if not mgr then return end
-        local rec_func = mgr:call("get_RecordFunc")
-        if not rec_func then return end
-        local t_data = rec_func:get_field("_tData")
-        if not t_data then return end
-        local rec_setting = t_data:get_field("RecordSetting")
-        if not rec_setting then return end
-        local fighter_list = rec_setting:get_field("FighterDataList")
-        if not fighter_list then return end
+local function _tr_do_update_real_slot_info()
+    local mgr = sdk.get_managed_singleton("app.training.TrainingManager")
+    if not mgr then return end
+    local rec_func = mgr:call("get_RecordFunc")
+    if not rec_func then return end
+    local t_data = rec_func:get_field("_tData")
+    if not t_data then return end
+    local rec_setting = t_data:get_field("RecordSetting")
+    if not rec_setting then return end
+    local fighter_list = rec_setting:get_field("FighterDataList")
+    if not fighter_list then return end
 
-        local target_id = game_state.p2_id
-        if target_id == -1 then return end
+    local target_id = game_state.p2_id
+    if target_id == -1 then return end
 
-        local dummy = fighter_list:call("get_Item", target_id) 
-        if not dummy then return end
-        local record_slots = dummy:get_field("RecordSlots")
-        if not record_slots then return end
+    local dummy = fighter_list:call("get_Item", target_id)
+    if not dummy then return end
+    local record_slots = dummy:get_field("RecordSlots")
+    if not record_slots then return end
 
-        for i=0, 7 do
-            local slot_obj = record_slots:call("get_Item", i)
-            if slot_obj then
-                local lua_idx = i + 1
-                real_slot_status[lua_idx].is_valid = slot_obj:get_field("IsValid")
-                real_slot_status[lua_idx].is_active = slot_obj:get_field("IsActive")
-            end
+    for i=0, 7 do
+        local slot_obj = record_slots:call("get_Item", i)
+        if slot_obj then
+            local lua_idx = i + 1
+            real_slot_status[lua_idx].is_valid = slot_obj:get_field("IsValid")
+            real_slot_status[lua_idx].is_active = slot_obj:get_field("IsActive")
         end
-    end)
+    end
+end
+
+local function update_real_slot_info()
+    pcall(_tr_do_update_real_slot_info)
 end
 
 local function load_conf()
@@ -548,6 +550,11 @@ local function manage_playback()
     -- IF SESSION IS NOT RUNNING -> DO NOTHING (Allows Manual Recording)
 end
 
+local function _tr_req_refresh()
+    local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+    if tm then tm:call("set_IsReqRefresh", true) end
+end
+
 local function update_logic()
     local now = os.clock(); local dt = now - session.last_clock; session.last_clock = now
     
@@ -576,10 +583,7 @@ local function update_logic()
         session.auto_reset_timer = session.auto_reset_timer - dt
         if session.auto_reset_timer <= 0 then
             session.auto_reset_timer = -1
-            pcall(function()
-                local tm = sdk.get_managed_singleton("app.training.TrainingManager")
-                if tm then tm:call("set_IsReqRefresh", true) end
-            end)
+            pcall(_tr_req_refresh)
             session.is_tracking = false
             session.score_processed = false
             session._p2_was_parried = false
@@ -618,7 +622,7 @@ local function update_logic()
                 call_tm_method("ForceApply")
                 export_log_excel()
                 SessionRecap.show("REACTION DRILLS", LOG_FILENAME, "reactions")
-                set_feedback(session.total .. " TRIALS DONE! & EXPORTED", COLORS.Red, 0)
+                set_feedback(session.total .. " TRIALS DONE! & EXPORTED", COLORS.Yellow, 0)
             end
         end
     end
@@ -658,18 +662,6 @@ local function update_logic()
     session.p1_max_frame = 0
     session.p2_max_frame = 0
     session.p2_is_end_flag = false
-
-    local p2_act_st = 0
-    pcall(function()
-        local gB = sdk.find_type_definition("gBattle")
-        local pm = gB:get_field("Player"):get_data(nil)
-        local p2obj = pm:call("getPlayer", 1)
-        if p2obj then
-            local ast = p2obj:get_type_definition():get_field("act_st"):get_data(p2obj)
-            p2_act_st = tonumber(tostring(ast)) or 0
-        end
-    end)
-    local p2_is_neutral = (p2_act_st == 0)
 
     local p1 = session.p1_state
     local p2 = session.p2_state
@@ -753,7 +745,7 @@ local function update_logic()
             end
         end
         
-        if p2_is_neutral then
+        if p2 == STATE_NEUTRAL then
             session.is_tracking = false
             if session.track_timer > 2 then
                 if not session.score_processed then
@@ -801,7 +793,7 @@ local function handle_input()
 
     local kb_state = {}
     for _, k in ipairs({0x31, 0x32, 0x33, 0x34}) do
-        local ok, down = pcall(function() return reframework:is_key_down(k) end)
+        local ok, down = pcall(reframework.is_key_down, reframework, k)
         kb_state[k] = ok and down
     end
     local function kb_pressed(k) return kb_state[k] and not last_kb_state[k] end
@@ -1046,6 +1038,11 @@ end
 -- =========================================================
 -- SESSION BUTTONS — FLOATING (single-line, ComboTrials style)
 -- =========================================================
+local _rsm_dd_idx = 1
+local _rsm_dd_last_p2 = -1
+local _rsm_dd_display = { "-- Select File --" }
+local _rsm_dd_raw = {}
+
 local function draw_session_floating()
     local visible, sw, sh = SharedUI.begin_floating_window("Reaction Drills##float")
     if not visible then
@@ -1068,10 +1065,36 @@ local function draw_session_floating()
     local max_w = 0
     for _, t in ipairs(all_labels) do local tw = imgui.calc_text_size(t).x; if tw > max_w then max_w = tw end end
     local cb_size = imgui.calc_text_size("W").y + 6
-    local remaining = w_width - (pad_x * 2) - cb_size - 10 - (sp * 4)
-    local actual_w = math.max(max_w + 20, remaining / 4)
+    local has_rsm = _G._rsm_api ~= nil
+    local n_cols = has_rsm and 5 or 4
+    local remaining = w_width - (pad_x * 2) - cb_size - 10 - (sp * n_cols)
+    local actual_w = math.max(max_w + 20, remaining / n_cols)
 
     imgui.set_cursor_pos(Vector2f.new(pad_x, sh * 0.01))
+
+    if has_rsm then
+        local cur_p2 = _G._rsm_p2_id or -1
+        if cur_p2 ~= _rsm_dd_last_p2 then
+            _rsm_dd_last_p2 = cur_p2
+            _rsm_dd_display, _rsm_dd_raw = _G._rsm_api.get_file_list()
+            _rsm_dd_idx = 1
+        end
+        imgui.push_style_color(7, 0xFF3D3D3D)
+        imgui.push_style_color(8, 0xFF4D4D4D)
+        imgui.push_style_color(9, 0xFF5D5D5D)
+        imgui.push_item_width(actual_w)
+        local dd_changed, dd_new = imgui.combo("##rsm_react", _rsm_dd_idx, _rsm_dd_display)
+        imgui.pop_item_width()
+        imgui.pop_style_color(3)
+        if dd_changed then
+            _rsm_dd_idx = dd_new
+            if dd_new > 1 and _rsm_dd_raw[dd_new - 1] then
+                _G._rsm_api.import_and_activate(_rsm_dd_raw[dd_new - 1])
+            end
+        end
+        imgui.same_line(0, sp)
+    end
+
     if user_config.session_mode == 2 then
         if SharedUI.sf6_button("TRIALS - (" .. sl("D") .. ")##fl_r", SC.c1, actual_w) then user_config.trial_count = math.max(10, user_config.trial_count - 10); reset_session_stats(); save_conf() end
         imgui.same_line(0, sp)

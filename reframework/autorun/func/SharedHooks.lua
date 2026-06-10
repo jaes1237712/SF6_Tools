@@ -8,6 +8,15 @@ local _td_gBattle = sdk.find_type_definition("gBattle")
 local _td_mediator = sdk.find_type_definition("app.FBattleMediator")
 local _f_playerType = _td_mediator and _td_mediator:get_field("PlayerType")
 
+local function _sh_get_enum_value(p)
+    return p:get_type_definition():get_field("value__"):get_data(p)
+end
+
+local function _sh_get_player_singleton()
+    if not _td_gBattle then return nil end
+    return _td_gBattle:get_field("Player"):get_data(nil)
+end
+
 -- =========================================================
 -- SHARED HOOK: UpdateGameInfo (was in CT, DL, SB separately)
 -- Publishes player character IDs to _G._shared_player_info
@@ -28,9 +37,7 @@ if _td_mediator then
             for i = 0, 1 do
                 local ok4, p = pcall(pt.call, pt, "GetValue", i)
                 if ok4 and p then
-                    local ok5, pid = pcall(function()
-                        return p:get_type_definition():get_field("value__"):get_data(p)
-                    end)
+                    local ok5, pid = pcall(_sh_get_enum_value, p)
                     if ok5 and pid then
                         _G._shared_player_info[i].id = pid
                         _G._shared_player_info[i].key = string.format("ESF_%03d", pid)
@@ -69,10 +76,7 @@ if cplayer_type then
                 _addr_refresh = _addr_refresh + 1
                 if _addr_refresh >= 120 or not _cached_addr[0] then
                     _addr_refresh = 0
-                    local ok, sP = pcall(function()
-                        if not _td_gBattle then return nil end
-                        return _td_gBattle:get_field("Player"):get_data(nil)
-                    end)
+                    local ok, sP = pcall(_sh_get_player_singleton)
                     if ok and sP and sP.mcPlayer then
                         _cached_sP = sP
                         for i = 0, 1 do

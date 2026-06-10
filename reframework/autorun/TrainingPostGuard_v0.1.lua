@@ -544,7 +544,7 @@ local function handle_input()
 
     local kb_state = {}
     for _, k in ipairs({0x31, 0x32, 0x33, 0x34}) do
-        local ok, down = pcall(function() return reframework:is_key_down(k) end)
+        local ok, down = pcall(reframework.is_key_down, reframework, k)
         kb_state[k] = ok and down
     end
     local function kb_pressed(k) return kb_state[k] and not last_kb_state[k] end
