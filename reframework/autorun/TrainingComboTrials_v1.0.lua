@@ -187,10 +187,12 @@ local trial_state = {
     _saved_vital_p2 = nil,
     _saved_gauge_atk = nil,
     _saved_dummy_action = nil,
+    _saved_unique_atk = nil,
     _pending_victim_hp = nil,
     _pending_attacker_hp = nil,
     _pending_attacker_drive = nil,
     _pending_attacker_super = nil,
+    _pending_attacker_style = nil,
     _rec_pending_snapshot = 0,
     _was_playing = false,   -- Previous state for detecting transitions
     _step1_wrong_pending = false,
@@ -205,7 +207,10 @@ local demo_state = {
     current_frame = 0,
     current_step = 1,
     sequence = {},
-    p1_mask = 0
+    p1_mask = 0,
+    raw_buffer = nil,
+    play_index = 1,
+    countdown = 0,
 }
 local p_id_stack = {}
 local tick_done_this_frame = false
@@ -994,10 +999,21 @@ local function snapshot_gauges(attacker_idx)
 
         if v_hp == nil or a_dr == nil or a_sa == nil then return end
 
+        -- Unique style level (Jamie drinks etc.): mStyleNo = live current level
+        local a_style, a_char_id = nil, nil
+        pcall(function()
+            local s = attacker:get_field("mStyleNo")
+            if s and s > 0 and s < 100 then a_style = s end
+            local info = _G._shared_player_info
+            if info and info[attacker_idx] then a_char_id = info[attacker_idx].id end
+        end)
+
         result = {
             victim_hp = v_hp,
             attacker_drive = a_dr,
             attacker_super = a_sa,
+            attacker_style = a_style,
+            attacker_char_id = a_char_id,
             -- Min trackers (updated each frame in on_frame)
             min_victim_hp = v_hp,
             min_atk_drive = a_dr,
@@ -1058,6 +1074,7 @@ local function apply_trial_vital()
     if cs then
         trial_state._pending_attacker_drive = cs.drive_used or 0
         trial_state._pending_attacker_super = cs.super_used or 0
+        trial_state._pending_attacker_style = (cs.style_stock and cs.style_stock > 0) and cs.style_stock or nil
     end
 
     pcall(function()
@@ -1127,6 +1144,29 @@ local function apply_trial_vital()
             ad.Is_SA_Recovery_Timer = false
             ad.Is_SA_No_Recovery = true
         end
+
+        -- Unique style (Jamie drinks etc.): set the training menu stock so the
+        -- refresh applies it natively (counter UI, command table, visuals)
+        if trial_state._pending_attacker_style then
+            local ud = ps:get_field("UniqueData")
+            local char_id = nil
+            local cs2 = trial_state.sequence[1] and trial_state.sequence[1].combo_stats
+            if cs2 and cs2.style_char_id then char_id = cs2.style_char_id end
+            if not char_id then
+                local info = _G._shared_player_info
+                if info and info[attacker_idx] then char_id = info[attacker_idx].id end
+            end
+            if ud and char_id then
+                local fname = string.format("stock_0_%03d", char_id)
+                local okv, cur = pcall(function() return ud:get_field(fname) end)
+                if okv and cur ~= nil then
+                    if not trial_state._saved_unique_atk then
+                        trial_state._saved_unique_atk = { field = fname, value = cur }
+                    end
+                    ud:set_field(fname, trial_state._pending_attacker_style)
+                end
+            end
+        end
     end)
 end
 
@@ -1151,6 +1191,7 @@ local function restore_trial_vital()
     trial_state._pending_attacker_hp = nil
     trial_state._pending_attacker_drive = nil
     trial_state._pending_attacker_super = nil
+    trial_state._pending_attacker_style = nil
     pcall(function()
         local tm = sdk.get_managed_singleton("app.training.TrainingManager")
         if not tm then return end
@@ -1191,6 +1232,14 @@ local function restore_trial_vital()
             ad.Is_SA_Recovery_Timer = sg.Is_SA_Recovery_Timer; ad.Is_SA_Infinity = sg.Is_SA_Infinity
             ad.Is_SA_No_Recovery = sg.Is_SA_No_Recovery; ad.Is_SA_Point_Lock = sg.Is_SA_Point_Lock
             trial_state._saved_gauge_atk = nil
+        end
+
+        if trial_state._saved_unique_atk then
+            local ud = ps:get_field("UniqueData")
+            if ud then
+                pcall(function() ud:set_field(trial_state._saved_unique_atk.field, trial_state._saved_unique_atk.value) end)
+            end
+            trial_state._saved_unique_atk = nil
         end
     end)
 end
@@ -1633,6 +1682,7 @@ local function reset_trial_flags()
     trial_state.fail_reason = nil
     trial_state._rec_gauges = nil
     trial_state._rec_hit_type = nil
+    trial_state._raw_rec_active = false
     if demo_state then demo_state.is_playing = false end
 end
 
@@ -1686,6 +1736,8 @@ local function start_recording(player_idx)
     trial_state._piyo_frame = nil
     trial_state._di_frame = nil
     trial_state._rec_frame_count = 0
+    trial_state._raw_rec_buffer = {}
+    trial_state._raw_rec_active = true
 end
 
 local function start_trial(player_idx)
@@ -2073,7 +2125,11 @@ local function handle_combo_shortcuts()
             if ctx.reset_visuals then ctx.reset_visuals() end
         end
         if is_pressed(BTN_DOWN) or kb_pressed(KB_4) then
-            if ctx.start_demo then ctx.start_demo() end
+            local _can_demo = true
+            local _hp = trial_state.sequence and trial_state.sequence[1] and trial_state.sequence[1].has_piyo
+            local _hr = trial_state.sequence and trial_state.sequence[1] and trial_state.sequence[1].raw_inputs
+            if _hp and not _hr and not _G._allow_stun_demo then _can_demo = false end
+            if _can_demo and ctx.start_demo then ctx.start_demo() end
         end
 
     else
@@ -3870,6 +3926,7 @@ re.on_frame(function()
     local _fidx = (_p_idx == 0) and (file_system.selected_file_idx_p1 or 1) or (file_system.selected_file_idx_p2 or 1)
     local _fname = _paths and _paths[_fidx] or ""
     _G.ComboTrials_CurrentFile = _fname:match("([^/\\]+)$") or _fname
+    _G.ComboTrials_CurrentPath = _fname
     _G.ComboTrials_CurrentStep = trial_state.current_step or 0
     _G.ComboTrials_TotalSteps = trial_state.sequence and #trial_state.sequence or 0
     _G.ComboTrials_IsPlaying = trial_state.is_playing or false
@@ -4041,6 +4098,11 @@ function save_trial_sequence()
             stats.damage     = math.max(0, init.victim_hp - (init.min_victim_hp or init.victim_hp))
             stats.drive_used = math.max(0, init.attacker_drive - (init.min_atk_drive or init.attacker_drive))
             stats.super_used = math.max(0, init.attacker_super - (init.min_atk_super or init.attacker_super))
+            -- Unique style (Jamie drinks etc.) active when the combo started
+            if init.attacker_style and init.attacker_style > 0 then
+                stats.style_stock = init.attacker_style
+                stats.style_char_id = init.attacker_char_id
+            end
         end
         trial_state.sequence[1].combo_stats = stats
         if (trial_state.sequence[1].counter_type == nil or trial_state.sequence[1].counter_type == 0) and stats.hit_type then
@@ -4058,7 +4120,12 @@ function save_trial_sequence()
     local meta = build_auto_xt_meta()
     if type(trial_state.sequence[1]) == "table" then
         trial_state.sequence[1]._xt_meta = meta
+        if trial_state._raw_rec_buffer and #trial_state._raw_rec_buffer > 0 then
+            trial_state.sequence[1].raw_inputs = trial_state._raw_rec_buffer
+        end
     end
+    trial_state._raw_rec_active = false
+    trial_state._raw_rec_buffer = {}
 
     if fs.create_dir then
         pcall(fs.create_dir, "TrainingComboTrials_data/CustomCombos"); pcall(fs.create_dir, "TrainingComboTrials_data/CustomCombos/" .. char_name)
@@ -4231,46 +4298,45 @@ end
 
 local function start_demo()
     if not trial_state.sequence or #trial_state.sequence == 0 then return end
-    if trial_state.sequence[1] and trial_state.sequence[1].has_piyo then return end
-    -- 1. Check for embedded timeline directly in the file (Merged files)
-    local timeline = trial_state.sequence[1].timeline
-    
-    -- 2. Backward compatibility fallback (Old 2-part files)
-    if not timeline then
-        local raw_file = trial_state.sequence[1].raw_input_file
-        if not raw_file then print("[ComboTrials] No timeline or raw input file!"); return end
-        
-        local loaded = json.load_file("TrainingComboTrials_data/ReplayRecords/" .. raw_file)
-        if not loaded or not loaded.timeline then print("[ComboTrials] Failed to load ReplayRecord"); return end
-        timeline = loaded.timeline
+    local has_raw = trial_state.sequence[1] and trial_state.sequence[1].raw_inputs
+    if trial_state.sequence[1] and trial_state.sequence[1].has_piyo and not has_raw then return end
+
+    -- RAW INPUTS (native-like playback) — preferred
+    local raw_inputs = trial_state.sequence[1].raw_inputs
+
+    -- LEGACY FALLBACK: parse timeline if no raw_inputs
+    if not raw_inputs then
+        local timeline = trial_state.sequence[1].timeline
+        if not timeline then
+            local raw_file = trial_state.sequence[1].raw_input_file
+            if not raw_file then print("[ComboTrials] No raw_inputs, timeline or raw_input_file!"); return end
+            local loaded = json.load_file("TrainingComboTrials_data/ReplayRecords/" .. raw_file)
+            if not loaded or not loaded.timeline then print("[ComboTrials] Failed to load ReplayRecord"); return end
+            timeline = loaded.timeline
+        end
+        demo_state.sequence = {}
+        for _, line in ipairs(timeline) do
+            local parsed = parse_timeline_line(line)
+            if parsed then table.insert(demo_state.sequence, parsed) end
+        end
+        if #demo_state.sequence == 0 then return end
+        demo_state.raw_buffer = nil
+    else
+        demo_state.raw_buffer = raw_inputs
+        demo_state.sequence = {}
     end
-    
-    demo_state.sequence = {}
-    for _, line in ipairs(timeline) do
-        local parsed = parse_timeline_line(line)
-        if parsed then table.insert(demo_state.sequence, parsed) end
-    end
-    if #demo_state.sequence == 0 then return end
 
     -- Force Trial mode to stay active on P1
     trial_state.is_recording = false
     trial_state.is_playing = true
     trial_state.playing_player = 0
-    
-    -- CLEANUP TIMERS
+
     trial_state.success_timer = 0
     trial_state.fail_timer = 0
     trial_state.fail_reason = nil
     trial_state.active_universal_hold = nil
-    
-    -- Full history purge at Demo launch
-    players[0].log = {}
-    players[0].input_history_queue = {}
-    if ComboTrials_D2D then
-        pcall(function() ComboTrials_D2D.reset_anim() end)
-        pcall(function() ComboTrials_D2D.reset_raw() end)
-    end
-    
+
+    reset_visual_state()
     update_trial_flip_state()
     reset_trial_steps()
 
@@ -4279,6 +4345,7 @@ local function start_demo()
     demo_state.current_frame = 0
     demo_state.current_step = 1
     demo_state.p1_mask = 0
+    demo_state.play_index = 1
     demo_state._total_frames = 0
     demo_state._di_delay_remaining = 0
     demo_state._di_step_idx = nil
@@ -4296,7 +4363,7 @@ local function start_demo()
         end
     end
 
-    print("[ComboTrials] DEMO Started for P1")
+    print("[ComboTrials] DEMO Started" .. (raw_inputs and " (RAW native)" or " (LEGACY timeline)"))
 end
 
 ctx.demo_state = demo_state
@@ -4493,7 +4560,7 @@ end
 -- Register with shared pl_input_sub hook (0_SharedHooks.lua)
 if _G._shared_input_pre then
 table.insert(_G._shared_input_pre, function(p_id, args)
-    if not tick_done_this_frame and demo_state.is_playing then
+    if not tick_done_this_frame and demo_state.is_playing and not demo_state.raw_buffer then
         if not trial_state.is_playing then
             demo_state.is_playing = false
             demo_state.p1_mask = 0
@@ -4603,7 +4670,55 @@ table.insert(_G._shared_input_post, function(p_id, retval)
     if p_id == 0 and _G.TrainingFuncHeld then
         pcall(_ct_clear_inputs, 0)
     end
-    if p_id == 0 and demo_state.is_playing and demo_state.p1_mask > 0 then
+    -- RAW RECORDING: capture P1 pl_input_new every hook call
+    if p_id == trial_state.recording_player and trial_state._raw_rec_active then
+        pcall(function()
+            local p = (p_id == 0) and GS.p1 or GS.p2
+            if p then
+                local inp = p:get_field("pl_input_new")
+                trial_state._raw_rec_buffer[#trial_state._raw_rec_buffer + 1] = (inp and tonumber(tostring(inp))) or 0
+            end
+        end)
+    end
+    -- RAW DEMO PLAYBACK
+    if p_id == 0 and demo_state.is_playing and demo_state.raw_buffer then
+        pcall(function()
+            if demo_state.countdown and demo_state.countdown > 0 then
+                demo_state.countdown = demo_state.countdown - 1
+                return
+            end
+            local pm = sdk.get_managed_singleton("app.PauseManager")
+            if pm then
+                local b = pm:get_field("_CurrentPauseTypeBit")
+                if b ~= 64 and b ~= 2112 then return end
+            end
+            local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+            if tm and tm:get_field("_IsReqRefresh") == true then return end
+
+            local idx = demo_state.play_index
+            if idx > #demo_state.raw_buffer then
+                demo_state.play_index = 1
+                demo_state.countdown = 30
+                trial_state.current_step = 1
+                trial_state.ui_visual_step = 1
+                trial_state._step1_wrong_pending = false
+                trial_state._first_hit_landed = false
+                trial_state._reset_grace = 15
+                for _, item in ipairs(trial_state.sequence) do
+                    item.actual_combo = 0; item.has_hit = false; item.last_frame_diff = nil
+                end
+                reinject_trial_vital()
+                return
+            end
+            local p1 = GS.p1
+            if not p1 then return end
+            local mask = demo_state.raw_buffer[idx]
+            p1:set_field("pl_input_new", mask)
+            p1:set_field("pl_sw_new", mask)
+            demo_state.play_index = idx + 1
+        end)
+    -- LEGACY DEMO FALLBACK (timeline-based, for old combos without raw_inputs)
+    elseif p_id == 0 and demo_state.is_playing and demo_state.p1_mask > 0 and not demo_state.raw_buffer then
         pcall(_ct_demo_inject_mask)
     end
 end)
