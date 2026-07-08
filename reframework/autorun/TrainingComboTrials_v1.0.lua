@@ -130,6 +130,15 @@ function unique_resources.resource_by_id(resource_id)
     return unique_resources.by_id[resource_id]
 end
 
+function unique_resources.fighter_id_for_resource(resource_id)
+    for fighter_id, char_data in pairs(unique_resources.by_fighter_id) do
+        for _, resource in ipairs(char_data.resources or {}) do
+            if resource.id == resource_id then return fighter_id end
+        end
+    end
+    return nil
+end
+
 local esf_names_map = {
     ["ESF_001"] = "Ryu",
     ["ESF_002"] = "Luke",
@@ -1629,22 +1638,23 @@ end
 
 function unique_resources.should_apply_entry(entry)
     if type(entry) ~= "table" then return false, "invalid_entry" end
-    if entry.resource_id ~= "stock_0_028" then return true end
+    local owner_fighter_id = unique_resources.fighter_id_for_resource(entry.resource_id)
+    if not owner_fighter_id then return false, "unknown_resource" end
 
-    if entry.fighter_id ~= nil and tonumber(entry.fighter_id) ~= 28 then
-        return false, "not_mai"
+    if entry.fighter_id ~= nil and tonumber(entry.fighter_id) ~= tonumber(owner_fighter_id) then
+        return false, "wrong_resource_owner"
     end
 
     local player_idx = unique_resources.side_to_player_idx(entry.side_key)
     if player_idx ~= nil then
-        if tonumber(unique_resources.read_training_fighter_id(player_idx)) ~= 28 then
-            return false, "not_mai"
+        if tonumber(unique_resources.read_training_fighter_id(player_idx)) ~= tonumber(owner_fighter_id) then
+            return false, "current_side_character_mismatch"
         end
         return true
     end
 
-    if unique_resources.any_current_fighter_is(28) then return true end
-    return false, "not_mai"
+    if unique_resources.any_current_fighter_is(owner_fighter_id) then return true end
+    return false, "current_character_mismatch"
 end
 
 function unique_resources.save_current()
@@ -1657,7 +1667,8 @@ function unique_resources.save_current()
     local saved = {}
     unique_resources.resource_by_id("")
     for resource_id, resource in pairs(unique_resources.by_id or {}) do
-        if resource_id ~= "stock_0_028" or unique_resources.any_current_fighter_is(28) then
+        local owner_fighter_id = unique_resources.fighter_id_for_resource(resource_id)
+        if owner_fighter_id and unique_resources.any_current_fighter_is(owner_fighter_id) then
             local value = unique_resources.normalize_value(resource, unique_resources.read_value(unique_data, resource_id))
             if value ~= nil then saved[resource_id] = value end
         end
@@ -1677,7 +1688,8 @@ function unique_resources.restore()
     if unique_data then
         local changed = false
         for resource_id, value in pairs(saved) do
-            if resource_id ~= "stock_0_028" or unique_resources.any_current_fighter_is(28) then
+            local owner_fighter_id = unique_resources.fighter_id_for_resource(resource_id)
+            if owner_fighter_id and unique_resources.any_current_fighter_is(owner_fighter_id) then
                 if unique_resources.write_value(unique_data, resource_id, value, data) then
                     changed = true
                 end
