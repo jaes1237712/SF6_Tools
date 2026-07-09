@@ -4,6 +4,16 @@ local re = re
 local json = json
 require("func/SharedHooks")
 local GS = require("func/GameState")
+-- Validation architecture shared with SF6_TOOLS_CC (cdjay)
+local ComboTrialsModules = {
+    DebugTrace = require("func/ComboTrials/DebugTrace"),
+    ActionMatcher = require("func/ComboTrials/ActionMatcher"),
+    CharacterRules = require("func/ComboTrials/CharacterRules"),
+    Validator = require("func/ComboTrials/Validator"),
+    PendingAbsorb = require("func/ComboTrials/PendingAbsorb")
+}
+local CharacterRules = ComboTrialsModules.CharacterRules
+local Validator = ComboTrialsModules.Validator
 
 pcall(function()
     if fs and fs.create_dir then fs.create_dir("TrainingComboTrials_data/exceptions") end
@@ -173,11 +183,7 @@ local esf_names_map = {
 }
 
 
-local common_exceptions = {}
-pcall(function()
-    local loaded = _G.safe_load_json("TrainingComboTrials_data/exceptions/Common.json")
-    if loaded then common_exceptions = loaded end
-end)
+local common_exceptions = CharacterRules.load_common()
 
 local XT_SETTINGS_FILE = "TrainingComboTrials_data/XT_Settings.json"
 local xt_settings = { default_author = "Anonymous" }
@@ -648,7 +654,7 @@ do
 end
 
 local function get_exc_filename(name)
-    return "TrainingComboTrials_data/exceptions/" .. name:gsub("[^%w_]", "") .. ".json"
+    return CharacterRules.get_exception_filename(name)
 end
 
 local function format_charge_motion(notation)
@@ -2949,13 +2955,7 @@ local function ct_player_init(p_idx, p_state)
             refresh_combo_list()
         end
         if p_state.profile_name ~= "Unknown" then
-            local filename = get_exc_filename(p_state.profile_name)
-            local loaded = json.load_file(filename)
-            if loaded then
-                p_state.exceptions = loaded
-            else
-                p_state.exceptions = {}
-            end
+            p_state.exceptions = CharacterRules.load_for_character(p_state.profile_name)
         end
     end
 
@@ -3202,10 +3202,10 @@ local function ct_player_hold_charge(p_state)
                 if (p_state.profile_name == "JP" or p_state.profile_name == "Lily") and (current_log.charge_max == nil or current_log.charge_max == "") then
                     current_log.charge_max = current_log.hold_frames
                     local id_s = tostring(current_log.id)
-                    local exc_to_update = p_state.exceptions[id_s] or common_exceptions[id_s]
+                    local exc_to_update = CharacterRules.get_exception(p_state.exceptions, common_exceptions, id_s)
                     if exc_to_update then
                         exc_to_update.charge_max = current_log.hold_frames
-                        if p_state.exceptions[id_s] then json.dump_file(get_exc_filename(p_state.profile_name), p_state.exceptions)
+                        if CharacterRules.has_character_exception(p_state.exceptions, id_s) then json.dump_file(get_exc_filename(p_state.profile_name), p_state.exceptions)
                         else json.dump_file("TrainingComboTrials_data/exceptions/Common.json", common_exceptions) end
                     end
                 end
@@ -3288,7 +3288,7 @@ local function ct_player_input_buffer(p_state)
                 end
                 if _pf.act_id == 36 or _pf.act_id == 37 or _pf.act_id == 38 then new_is_intentional = true end
 
-                local exc_new = p_state.exceptions[tostring(_pf.act_id)] or common_exceptions[tostring(_pf.act_id)]
+                local exc_new = CharacterRules.get_exception(p_state.exceptions, common_exceptions, _pf.act_id)
                 if exc_new and exc_new.force then new_is_intentional = true end
 
                 -- If the NEW action is truly intentional (e.g. player hit P, then PP 2 frames later),
@@ -3384,9 +3384,7 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
         local act_name = act_id_reverse_enum[act_id] or "Unknown"
 
         -- 1. EARLY EXCEPTION RESOLUTION (For Hold Link)
-        local exc_char = p_state.exceptions[tostring(act_id)]
-        local exc_com = common_exceptions[tostring(act_id)]
-        local exc = exc_char or exc_com
+        local exc, exc_char, exc_com = CharacterRules.get_exception(p_state.exceptions, common_exceptions, act_id)
 
         if p_state.editing_id == act_id then
             local _parsed_prev = nil
@@ -3413,24 +3411,14 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
             }
         end
 
-        -- CAMMY SPECIFIC: Force display and rename Spin Knuckle / Cannon Spike after Target Combo
-        if p_state.profile_name == "Cammy" and (act_id == 908 or act_id == 922) then
-            if #p_state.log > 0 and (p_state.log[1].id == 652 or p_state.log[1].id == 653 or p_state.log[1].id == 926) then
-                if not exc then exc = {} end
-                exc.force = true
-                if act_id == 908 then
-                    exc.override_name = "236+HK"
-                elseif act_id == 922 then
-                    exc.override_name = "623+HK"
-                end
-            end
-        end
+        -- Character-specific runtime overrides (Cammy TC followups etc.)
+        exc = CharacterRules.apply_runtime_overrides(p_state.profile_name, act_id, exc, p_state.log)
 
         -- ABSORPTION CHECK (Does the active parent action want to absorb this new ID?)
         local is_continuation = false
         if #p_state.log > 0 then
             local parent_id = p_state.log[1].id
-            local parent_exc = p_state.exceptions[tostring(parent_id)] or common_exceptions[tostring(parent_id)]
+            local parent_exc = CharacterRules.get_exception(p_state.exceptions, common_exceptions, parent_id)
 
             -- Real-time update if we are editing the parent action
             if p_state.editing_id == parent_id then
@@ -3579,10 +3567,10 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
                         if detected_min then
                             charge_min = detected_min
                             local id_s = tostring(act_id)
-                            local exc_to_update = p_state.exceptions[id_s] or common_exceptions[id_s]
+                            local exc_to_update = CharacterRules.get_exception(p_state.exceptions, common_exceptions, id_s)
                             if exc_to_update then
                                 exc_to_update.charge_min = detected_min
-                                if p_state.exceptions[id_s] then
+                                if CharacterRules.has_character_exception(p_state.exceptions, id_s) then
                                     json.dump_file(get_exc_filename(p_state.profile_name), p_state.exceptions)
                                 else
                                     json.dump_file("TrainingComboTrials_data/exceptions/Common.json", common_exceptions)
@@ -3809,50 +3797,19 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
                                     trial_state.ui_visual_step = trial_state.current_step + 1
                                 end
 
-                                local combo_ok = true
-                                if trial_state.current_step > 1 then
-                                    local prev_step = trial_state.sequence[trial_state.current_step - 1]
-                                    if prev_step and prev_step.expected_combo ~= nil then
-                                        local skip_strict_check = (prev_step.is_projectile_hit == true)
-                                        local combo_now = _pf.current_combo or 0
-                                        if not skip_strict_check and combo_now ~= prev_step.expected_combo then
-                                            local current_hit_already_counted =
-                                                (expected.expected_combo or 0) > prev_step.expected_combo
-                                                and combo_now > prev_step.expected_combo
-                                                and combo_now <= (expected.expected_combo or 0)
-                                            if current_hit_already_counted then
-                                                combo_ok = true
-                                            elseif _pf.opponent_knocked_down and combo_now == 0 and prev_step.expected_combo == 0 then
-                                                combo_ok = true
-                                            elseif prev_step.expected_combo == 0 and combo_now > 0 then
-                                                combo_ok = true
-                                            elseif combo_now == 0 and prev_step.expected_combo > 0 then
-                                                -- Oki / cross-up setup: combo dropped naturally (opponent got up)
-                                                combo_ok = true
-                                            elseif expected and expected.expected_combo == 0 then
-                                                -- RESET TOLERANCE 2.0 (Standing Reset / Oki):
-                                                -- The sequence intends for the combo to drop to 0 after this move.
-                                                -- So it doesn't matter if the combo counter is still running (early input) 
-                                                -- or has just naturally dropped to 0. Both states are valid.
-                                                combo_ok = true
-                                            else
-                                                combo_ok = false
-                                            end
-                                        end
-                                    end
-                                end
-
-                                local hp_ok = true
-                                if expected.expected_hp ~= nil and process_act.current_hp ~= nil then
-                                    -- HP Validation: strict for oki (expected_combo == 0), lenient for combos
-                                    local prev_step = trial_state.current_step > 1 and trial_state.sequence[trial_state.current_step - 1] or nil
-                                    local is_oki = (prev_step and prev_step.expected_combo == 0)
-                                    if is_oki then
-                                        if process_act.current_hp ~= expected.expected_hp then
-                                            hp_ok = false
-                                        end
-                                    end
-                                end
+                                local prev_step_v = trial_state.current_step > 1 and trial_state.sequence[trial_state.current_step - 1] or nil
+                                local combo_ok = Validator.check_combo({
+                                    expected = expected,
+                                    prev_step = prev_step_v,
+                                    current_combo = _pf.current_combo or 0,
+                                    opponent_knocked_down = _pf.opponent_knocked_down,
+                                })
+                                local hp_ok = Validator.check_hp(
+                                    expected.expected_hp,
+                                    process_act.current_hp,
+                                    (prev_step_v and prev_step_v.expected_combo == 0),
+                                    expected
+                                )
 
                                 if combo_ok and hp_ok then
                                     trial_step_idx = trial_state.current_step
@@ -4057,7 +4014,7 @@ local function ct_player_universal_hold(p_idx, p_state)
             -- Optional retrieval of perfect windows (e.g. Luke)
             local p_min, p_max = nil, nil
             local act_id_str = tostring(p_state.prev_act_id)
-            local exc = p_state.exceptions[act_id_str] or common_exceptions[act_id_str]
+            local exc = CharacterRules.get_exception(p_state.exceptions, common_exceptions, act_id_str)
             if exc then p_min = exc.perfect_min; p_max = exc.perfect_max end
 
             local final_status = evaluate_charge_status(
