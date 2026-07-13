@@ -2174,6 +2174,7 @@ local function reset_trial_flags()
     trial_state._rec_hit_type = nil
     trial_state._raw_rec_active = false
     trial_state._attempt_had_demo = false
+    trial_state._pending_current_absorb = nil
     if demo_state then demo_state.is_playing = false end
 end
 
@@ -2340,6 +2341,7 @@ local function reset_trial_steps()
     trial_state.current_step = 1
     trial_state.ui_visual_step = 1
     trial_state._attempt_had_demo = false
+    trial_state._pending_current_absorb = nil
     trial_state.floating_info = nil
     trial_state._step1_wrong_pending = false
     trial_state._first_hit_landed = false
@@ -2647,6 +2649,51 @@ end
 -- PER-FRAME PLAYER CONTEXT (reused each player-loop iteration)
 -- =========================================================
 local _pf = {}
+
+-- =========================================================
+-- PENDING ABSORB support (SF6_TOOLS_CC validation semantics)
+-- =========================================================
+local DebugTrace = ComboTrialsModules.DebugTrace
+
+local function is_pressure_tail_step(step)
+    return Validator.is_pressure_tail_step(step)
+end
+
+local function is_post_hit_setup_step(step_idx)
+    if not trial_state.sequence or not step_idx or step_idx < 1 then return false end
+    local step = trial_state.sequence[step_idx]
+    if not step or step.expected_combo ~= 0 then return false end
+    if is_pressure_tail_step(step) then return false end
+    if step.has_hit == true then return false end
+    local step_damage = tonumber(step.damage_at_step) or 0
+    local prev = step_idx > 1 and trial_state.sequence[step_idx - 1] or nil
+    local prev_damage = prev and (tonumber(prev.damage_at_step) or 0) or 0
+    if step_damage > prev_damage then return false end
+    for i = 1, step_idx - 1 do
+        local earlier = trial_state.sequence[i]
+        if earlier and (earlier.expected_combo or 0) > 0 then
+            return true
+        end
+    end
+    return false
+end
+
+local function build_absorb_ctx(p_idx, p_state)
+    return {
+        state = trial_state,
+        p_idx = p_idx,
+        p_state = p_state,
+        frame = engine_frame_count,
+        pf = _pf,
+        Validator = Validator,
+        DebugTrace = DebugTrace,
+        is_post_hit_setup_step = is_post_hit_setup_step,
+        set_dummy_counter_type = set_dummy_counter_type,
+        d2d_cfg = d2d_cfg,
+        file_system = file_system,
+        act_id_reverse_enum = act_id_reverse_enum
+    }
+end
 local _replay_cleaned = false
 
 -- =========================================================
@@ -3148,6 +3195,10 @@ local function ct_player_tracking(p_idx, p_state)
 end
 
 local function ct_player_validation(p_idx, p_state)
+    -- Pending absorb confirmation (delayed absorbs, e.g. Honda)
+    if trial_state.is_playing and p_idx == trial_state.playing_player then
+        ComboTrialsModules.PendingAbsorb.check(build_absorb_ctx(p_idx, p_state), "pending_current_absorb_validation")
+    end
     -- SUCCESS VERIFICATION + DROP DETECTION (Trial)
     -- ========================================================
     local is_demo_playing = (demo_state and demo_state.is_playing)
@@ -3190,6 +3241,7 @@ local function ct_player_validation(p_idx, p_state)
                             trial_state.active_universal_hold = nil
                         elseif not _pf.opponent_knocked_down and not is_reset_expected
                             and not (last_validated.expected_combo == (trial_state.current_step >= 3 and trial_state.sequence[trial_state.current_step - 2].expected_combo or 0)) then
+                            ComboTrialsModules.PendingAbsorb.clear(trial_state, "combo_dropped")
                             trial_state.fail_timer = d2d_cfg.fail_display_frames or 120
                             if last_validated.last_frame_diff and last_validated.last_frame_diff < -2 then
                                 trial_state.fail_reason = string.format("TOO EARLY (%df)", math.abs(last_validated.last_frame_diff))
@@ -3910,6 +3962,7 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
                                     -- Tolerance: Expecting DR, got Parry → ignore, wait for DR
                                 elseif expecting_parry and is_current_dr then
                                     -- Tolerance: Expecting Parry, got DR directly → skip Parry step, validate DR on next
+                                    ComboTrialsModules.PendingAbsorb.clear(trial_state, "parry_dr_skip")
                                     trial_state._step1_wrong_pending = false
                                     trial_state.last_played_frame = engine_frame_count
                                     trial_state.current_step = trial_state.current_step + 1
@@ -3919,6 +3972,7 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
                                     end
                                 elseif expecting_dr and is_current_dr then
                                     -- Tolerance: DR id mismatch (739 vs 740 vs char-specific) → validate
+                                    ComboTrialsModules.PendingAbsorb.clear(trial_state, "drive_rush_tolerance")
                                     trial_state._step1_wrong_pending = false
                                     trial_state.last_played_frame = engine_frame_count
                                     trial_state.current_step = trial_state.current_step + 1
@@ -3949,15 +4003,72 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
                                         end
                                     end
                                     if not found_dr_step then
+                                        ComboTrialsModules.PendingAbsorb.clear(trial_state, "wrong_move")
                                         trial_state.fail_timer = d2d_cfg.fail_display_frames or 120
                                         trial_state.fail_reason = "WRONG MOVE"
                                     end
                                 else
-                                    if trial_state.current_step == 1 then
-                                        trial_state._step1_wrong_pending = true
-                                    else
-                                        trial_state.fail_timer = d2d_cfg.fail_display_frames or 120
-                                        trial_state.fail_reason = "WRONG MOVE"
+                                    -- DELAYED/CHAINED ABSORB (SF6_TOOLS_CC): before failing,
+                                    -- check absorb confirmations (e.g. Honda absorbed hits)
+                                    local absorb_handled = false
+                                    if expected and trial_state.current_step > 1 then
+                                        local actx = build_absorb_ctx(p_idx, p_state)
+                                        local frames_since_prev = engine_frame_count - (trial_state.last_played_frame or engine_frame_count)
+                                        local abs_frame_diff = Validator.calculate_frame_diff(frames_since_prev, expected.delay_from_prev or 0)
+                                        local recent = CharacterRules.find_recent_absorb_confirmation(
+                                            p_state.exceptions, common_exceptions, expected, p_state.log, p_state.profile_name)
+                                        if recent.matched then
+                                            absorb_handled = ComboTrialsModules.PendingAbsorb.apply_matched_step(actx, {
+                                                expected = expected,
+                                                actual_action_id = recent.actual_action_id,
+                                                actual_motion = recent.motion or "Unknown",
+                                                actual_input = recent.real_input or "None",
+                                                frame = recent.start_frame or engine_frame_count,
+                                                combo_count = recent.combo_count or (_pf.current_combo or 0),
+                                                actual_hp = process_act.current_hp,
+                                                match_reason = recent.match_reason,
+                                                match_details = recent
+                                            }) and true or false
+                                        else
+                                            local current_absorb = CharacterRules.match_current_absorb_confirmation(
+                                                p_state.exceptions, common_exceptions, expected, act_id, _pf.current_combo or 0, p_state.profile_name)
+                                            if current_absorb.matched then
+                                                absorb_handled = ComboTrialsModules.PendingAbsorb.apply_matched_step(actx, {
+                                                    expected = expected,
+                                                    actual_action_id = current_absorb.actual_action_id,
+                                                    actual_motion = motion_str,
+                                                    actual_input = real_input_str,
+                                                    frame = engine_frame_count,
+                                                    combo_count = current_absorb.combo_count or 0,
+                                                    actual_hp = process_act.current_hp,
+                                                    match_reason = current_absorb.match_reason,
+                                                    match_details = current_absorb
+                                                }) and true or false
+                                            elseif current_absorb.block_reason == "combo_not_reached" then
+                                                local match_probe = {
+                                                    step = trial_state.current_step,
+                                                    frame = engine_frame_count,
+                                                    frames_since_prev_step = frames_since_prev,
+                                                    expected_delay = expected.delay_from_prev,
+                                                    frame_diff = abs_frame_diff,
+                                                    actual_motion = motion_str,
+                                                    actual_input = real_input_str,
+                                                    current_combo = _pf.current_combo or 0
+                                                }
+                                                absorb_handled = ComboTrialsModules.PendingAbsorb.store(
+                                                    actx, expected, current_absorb, match_probe, process_act.current_hp) == true
+                                            end
+                                        end
+                                    end
+
+                                    if not absorb_handled then
+                                        if trial_state.current_step == 1 then
+                                            trial_state._step1_wrong_pending = true
+                                        else
+                                            ComboTrialsModules.PendingAbsorb.clear(trial_state, "wrong_move")
+                                            trial_state.fail_timer = d2d_cfg.fail_display_frames or 120
+                                            trial_state.fail_reason = "WRONG MOVE"
+                                        end
                                     end
                                 end
                             end

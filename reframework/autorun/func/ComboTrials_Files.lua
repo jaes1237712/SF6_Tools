@@ -152,6 +152,19 @@ local function attach_completion_api()
             if type(key) == "string" and value then file_system.completed_trials[key] = true end
         end
     end)
+
+    -- Gated diagnostic log (enable with _G.CT_DIAG_LOG = true) — consumed by
+    -- ComboTrials/DebugTrace.log_trial_failure, SF6_TOOLS_CC-compatible
+    file_system.diag_log = function(message)
+        if rawget(_G, "CT_DIAG_LOG") ~= true then return end
+        pcall(function()
+            local f = io.open("TrainingComboTrials_data/ct_diag.log", "a")
+            if f then
+                f:write(os.date("%H:%M:%S ") .. tostring(message) .. "\n")
+                f:close()
+            end
+        end)
+    end
 end
 
 function M.init(context)

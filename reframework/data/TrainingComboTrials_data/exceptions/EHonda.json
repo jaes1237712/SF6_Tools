@@ -13,6 +13,33 @@
         "is_holdable": false,
         "override_name": "RAW DR"
     },
+    "605": {
+        "absorb_ids": "606",
+        "force": false,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "HP"
+    },
+    "606": {
+        "absorb_ids": "",
+        "force": true,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "HP"
+    },
+    "622": {
+        "absorb_ids": "624",
+        "force": false,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "2HP"
+    },
     "652": {
         "absorb_ids": "",
         "force": true,
@@ -55,6 +82,15 @@
         "ignore_prev_frames": 5,
         "is_holdable": false,
         "override_name": "4THROW"
+    },
+    "926": {
+        "absorb_ids": "921",
+        "force": false,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "214+HP"
     },
     "959": {
         "absorb_ids": "",
@@ -110,8 +146,17 @@
         "is_holdable": false,
         "override_name": ">2P"
     },
-    "972": {
+    "971": {
         "absorb_ids": "",
+        "force": true,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "22+K"
+    },
+    "972": {
+        "absorb_ids": "973",
         "force": false,
         "hold_partial_check": true,
         "ignore": false,
