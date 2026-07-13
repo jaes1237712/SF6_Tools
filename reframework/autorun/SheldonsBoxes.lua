@@ -371,12 +371,9 @@ local function _sb_clean_ft(raw_ft, raw_mg, st)
         if not st.in_move then
             st.clean = 0; st.prev_raw = raw_ft; return
         end
-        if raw_mg == 1 then
-            st.recovery_count = st.recovery_count + 1
-        end
-        if st.recovery_count >= 2 then
-            st.clean = 0; st.recovery_count = 0; st.in_move = false; st.prev_raw = raw_ft; return
-        end
+        -- (fix 2026-07-03) sortie de recovery par compteur MainGauge RETIREE : elle tirait
+        -- UNE FRAME TROP TOT (pendant la derniere frame de recovery). La sortie exacte est
+        -- desormais le check act_st == 0, evalue CHAQUE frame en fin de _sb_update_frame_types.
     elseif raw_ft == 9 then
         if st.prev_raw ~= 9 and not st.in_hitstun then
             st.in_hitstun = true; st.hitstun_count = 0
@@ -384,12 +381,7 @@ local function _sb_clean_ft(raw_ft, raw_mg, st)
         if not st.in_hitstun then
             st.clean = 0; st.prev_raw = raw_ft; return
         end
-        if raw_mg == 1 then
-            st.hitstun_count = st.hitstun_count + 1
-        end
-        if st.hitstun_count >= 2 then
-            st.clean = 0; st.hitstun_count = 0; st.in_hitstun = false; st.prev_raw = raw_ft; return
-        end
+        -- (fix 2026-07-03) idem pour la sortie de hitstun : act_st fait foi, frame-exact.
     else
         st.in_move = false
         st.recovery_count = 0
@@ -483,13 +475,18 @@ local function _sb_update_frame_types()
             local mg2 = it2 and (tonumber(tostring(it2:get_field("MainGauge"))) or 0) or 0
             _sb_clean_ft(ft1, mg1, _sb_ft[0])
             _sb_clean_ft(ft2, mg2, _sb_ft[1])
-            if GS.p1_act_st == 0 then _sb_ft[0].clean = 0; _sb_ft[0].in_move = false; _sb_ft[0].in_hitstun = false end
-            if GS.p2_act_st == 0 then _sb_ft[1].clean = 0; _sb_ft[1].in_move = false; _sb_ft[1].in_hitstun = false end
         end
     else
         _sb_ft[0].clean = 0; _sb_ft[0].prev_raw = 0; _sb_ft[0].recovery_count = 0; _sb_ft[0].in_move = false; _sb_ft[0].hitstun_count = 0; _sb_ft[0].in_hitstun = false
         _sb_ft[1].clean = 0; _sb_ft[1].prev_raw = 0; _sb_ft[1].recovery_count = 0; _sb_ft[1].in_move = false; _sb_ft[1].hitstun_count = 0; _sb_ft[1].in_hitstun = false
     end
+    -- (fix 2026-07-03) sortie de move FRAME-EXACTE : act_st evalue CHAQUE frame. Avant, ce
+    -- check vivait dans le bloc head-advance ci-dessus : il n'etait evalue que quand la barre
+    -- ajoutait une cellule — or elle s'arrete PILE a la fin de la recovery, donc il ne pouvait
+    -- jamais voir la transition ; la sortie venait de l'heuristique MainGauge, une frame trop
+    -- tot. act_st == 0 = actionnable = fin de recovery par definition (source func/GameState).
+    if GS.p1_act_st == 0 then _sb_ft[0].clean = 0; _sb_ft[0].in_move = false; _sb_ft[0].in_hitstun = false end
+    if GS.p2_act_st == 0 then _sb_ft[1].clean = 0; _sb_ft[1].in_move = false; _sb_ft[1].in_hitstun = false end
 end
 
 local detected_infos = { [0] = { name = "Waiting...", id = -1 }, [1] = { name = "Waiting...", id = -1 } }
