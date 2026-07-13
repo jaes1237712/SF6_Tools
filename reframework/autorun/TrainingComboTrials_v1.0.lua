@@ -493,6 +493,8 @@ local D2D_CONFIG_FILE = "TrainingComboTrials_data/CommandLogger_Visualizer.json"
 local d2d_cfg = {
     enabled = true,
     auto_load = true,
+    auto_next_trial = true,    -- after a manual success: auto-load the next combo in the list
+    auto_retry_on_fail = true, -- after the fail banner ends: auto-reset the trial
     forced_position_idx = 1,
     show_p1 = true,
     show_p2 = true,
@@ -1878,34 +1880,39 @@ local function restore_dummy_guard_type()
     end
 end
 
-local function set_dummy_action_type(val)
+local function set_dummy_action_type(val, jump_type)
     pcall(function()
         local tm = sdk.get_managed_singleton("app.training.TrainingManager")
         if not tm then return end
         local dd = tm:get_field("_tData"):get_field("DummyStatus"):get_field("DummyData")
         dd.DummyActionType = val
+        if jump_type ~= nil then dd.JumpType = jump_type end
     end)
 end
 
+-- Returns configured dummy behavior (action type, jump type) — the training
+-- menu INTENT, as opposed to the live victim pose (SF6_TOOLS_CC environment)
 local function read_dummy_action_type()
-    local result = 0
+    local result, jump = 0, 0
     pcall(function()
         local tm = sdk.get_managed_singleton("app.training.TrainingManager")
         if not tm then return end
         local dd = tm:get_field("_tData"):get_field("DummyStatus"):get_field("DummyData")
         result = dd.DummyActionType or 0
+        jump = dd.JumpType or 0
     end)
-    return result
+    return result, jump
 end
 
 local function save_dummy_action_type()
-    trial_state._saved_dummy_action = read_dummy_action_type()
+    trial_state._saved_dummy_action, trial_state._saved_dummy_jump = read_dummy_action_type()
 end
 
 local function restore_dummy_action_type()
     if trial_state._saved_dummy_action ~= nil then
-        set_dummy_action_type(trial_state._saved_dummy_action)
+        set_dummy_action_type(trial_state._saved_dummy_action, trial_state._saved_dummy_jump)
         trial_state._saved_dummy_action = nil
+        trial_state._saved_dummy_jump = nil
     end
 end
 
@@ -2162,8 +2169,11 @@ local function reset_trial_flags()
     trial_state.fail_reason = nil
     trial_state._rec_gauges = nil
     trial_state._rec_scene_state = nil
+    trial_state._rec_dummy_action = nil
+    trial_state._rec_dummy_jump = nil
     trial_state._rec_hit_type = nil
     trial_state._raw_rec_active = false
+    trial_state._attempt_had_demo = false
     if demo_state then demo_state.is_playing = false end
 end
 
@@ -2209,6 +2219,7 @@ local function start_recording(player_idx)
     apply_forced_position(true) -- skip_mirror: record in normal position
 
     trial_state._rec_gauges = nil
+    trial_state._rec_dummy_action, trial_state._rec_dummy_jump = read_dummy_action_type()
     trial_state._rec_pending_snapshot = 8
     trial_state._rec_hit_type = nil
     trial_state._piyo_detected = false
@@ -2239,9 +2250,12 @@ local function start_trial(player_idx)
     local first_ct = trial_state.sequence and trial_state.sequence[1] and trial_state.sequence[1].counter_type or 0
     set_dummy_counter_type(first_ct)
 
-    -- INJECT DUMMY STANCE from step 1 (0=Stand, 1=Crouch)
-    local first_pose = trial_state.sequence and trial_state.sequence[1] and trial_state.sequence[1].victim_pose
-    if first_pose == 1 then
+    -- INJECT DUMMY BEHAVIOR from step 1: configured menu intent when recorded
+    -- (handles jump/crouch configs), else live victim_pose fallback (replays)
+    local s1 = trial_state.sequence and trial_state.sequence[1]
+    if s1 and s1.dummy_action_type ~= nil then
+        set_dummy_action_type(s1.dummy_action_type, s1.dummy_jump_type)
+    elseif s1 and s1.victim_pose == 1 then
         set_dummy_action_type(1)
     else
         set_dummy_action_type(0)
@@ -2325,6 +2339,7 @@ end
 local function reset_trial_steps()
     trial_state.current_step = 1
     trial_state.ui_visual_step = 1
+    trial_state._attempt_had_demo = false
     trial_state.floating_info = nil
     trial_state._step1_wrong_pending = false
     trial_state._first_hit_landed = false
@@ -2360,6 +2375,29 @@ end
 
 local function handle_combo_shortcuts()
     return ComboTrials_Hotkeys.handle_combo_shortcuts()
+end
+
+-- =========================================================
+-- TRIAL PROGRESSION (SF6_TOOLS_CC feature): auto-advance to next combo
+-- =========================================================
+ctx.advance_to_next_trial = function()
+    local p_idx = trial_state.playing_player or 0
+    local paths = (p_idx == 0) and file_system.saved_combos_paths_p1 or file_system.saved_combos_paths_p2
+    local idx = (p_idx == 0) and (file_system.selected_file_idx_p1 or 1) or (file_system.selected_file_idx_p2 or 1)
+    if type(paths) ~= "table" or #paths == 0 then return false end
+    if idx >= #paths then
+        ct_ticker("LAST COMBO IN LIST")
+        return false
+    end
+
+    if p_idx == 0 then
+        file_system.selected_file_idx_p1 = idx + 1
+    else
+        file_system.selected_file_idx_p2 = idx + 1
+    end
+    load_and_start_trial(p_idx)
+    ct_ticker(string.format("NEXT COMBO (%d/%d)", idx + 1, #paths))
+    return true
 end
 
 -- =========================================================
@@ -2908,7 +2946,25 @@ local function ct_player_init(p_idx, p_state)
         if trial_state.success_timer > 0 then
             trial_state.success_timer = trial_state.success_timer - 1
             if trial_state.success_timer <= 0 then
-                reset_trial_steps()
+                -- Completion tracking + auto-advance (SF6_TOOLS_CC feature):
+                -- demo-driven finishes are tainted and never count
+                local advanced = false
+                if not trial_state._attempt_had_demo then
+                    local sp_idx = trial_state.playing_player or 0
+                    local spaths = (sp_idx == 0) and file_system.saved_combos_paths_p1 or file_system.saved_combos_paths_p2
+                    local sidx = (sp_idx == 0) and (file_system.selected_file_idx_p1 or 1) or (file_system.selected_file_idx_p2 or 1)
+                    local spath = spaths and spaths[sidx]
+                    if spath and file_system.mark_trial_completed then
+                        file_system.mark_trial_completed(spath)
+                    end
+                    if d2d_cfg.auto_next_trial ~= false then
+                        advanced = ctx.advance_to_next_trial()
+                    end
+                end
+                trial_state._attempt_had_demo = false
+                if not advanced then
+                    reset_trial_steps()
+                end
             end
         end
 
@@ -2923,7 +2979,12 @@ local function ct_player_init(p_idx, p_state)
             if trial_state.fail_timer <= 0 then
                 trial_state.fail_reason = nil
                 trial_state._fail_captured = false
-                reset_trial_steps()
+                if d2d_cfg.auto_retry_on_fail ~= false then
+                    reset_trial_steps()
+                else
+                    -- Manual mode: leave the trial; restart via shortcut/UI
+                    trial_state.is_playing = false
+                end
             end
         end
     	end
@@ -4232,6 +4293,13 @@ function save_trial_sequence()
             trial_state.sequence[1].scene_state = scene_state
         end
         trial_state._rec_scene_state = nil
+        -- Configured dummy behavior (menu intent; victim_pose stays as live fallback)
+        if trial_state._rec_dummy_action ~= nil then
+            trial_state.sequence[1].dummy_action_type = trial_state._rec_dummy_action
+            trial_state.sequence[1].dummy_jump_type = trial_state._rec_dummy_jump or 0
+        end
+        trial_state._rec_dummy_action = nil
+        trial_state._rec_dummy_jump = nil
     end
     trial_state._raw_rec_active = false
     trial_state._raw_rec_buffer = {}
@@ -4409,6 +4477,10 @@ local function start_demo()
     if not trial_state.sequence or #trial_state.sequence == 0 then return end
     local has_raw = trial_state.sequence[1] and trial_state.sequence[1].raw_inputs
     if trial_state.sequence[1] and trial_state.sequence[1].has_piyo and not has_raw then return end
+
+    -- Demo drives the same validation pipeline: taint the attempt so a
+    -- demo-driven finish never counts as a completed trial
+    trial_state._attempt_had_demo = true
 
     -- RAW INPUTS (native-like playback) — preferred
     local raw_inputs = trial_state.sequence[1].raw_inputs

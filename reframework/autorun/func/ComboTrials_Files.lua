@@ -108,6 +108,52 @@ function M.refresh_combo_list(recent_saved_player)
     end
 end
 
+-- =========================================================
+-- COMPLETED TRIALS TRACKING (runtime sidecar, SF6_TOOLS_CC-compatible)
+-- API attached to file_system so main file and UI share it.
+-- Sidecar lives OUTSIDE the per-character combo directories.
+-- =========================================================
+local COMPLETED_TRIALS_FILE = "TrainingComboTrials_data/CompletedTrials.json"
+
+local function attach_completion_api()
+    file_system.completed_trials = file_system.completed_trials or {}
+
+    file_system.completed_trial_key = function(path)
+        return (tostring(path or ""):gsub("\\", "/")):lower()
+    end
+
+    file_system.save_completed_trials = function()
+        json.dump_file(COMPLETED_TRIALS_FILE, file_system.completed_trials)
+    end
+
+    file_system.is_trial_completed = function(path)
+        local key = file_system.completed_trial_key(path)
+        return key ~= "" and file_system.completed_trials[key] == true
+    end
+
+    file_system.mark_trial_completed = function(path)
+        local key = file_system.completed_trial_key(path)
+        if key == "" or file_system.completed_trials[key] then return false end
+        file_system.completed_trials[key] = true
+        file_system.save_completed_trials()
+        return true
+    end
+
+    file_system.clear_completed_trials = function()
+        file_system.completed_trials = {}
+        file_system.save_completed_trials()
+    end
+
+    pcall(function()
+        if type(_G.safe_load_json) ~= "function" then return end
+        local loaded = _G.safe_load_json(COMPLETED_TRIALS_FILE)
+        if type(loaded) ~= "table" then return end
+        for key, value in pairs(loaded) do
+            if type(key) == "string" and value then file_system.completed_trials[key] = true end
+        end
+    end)
+end
+
 function M.init(context)
     trial_state = context.trial_state
     file_system = context.file_system
@@ -115,6 +161,7 @@ function M.init(context)
     assign_groups = context.assign_groups
     reset_trial_flags = context.reset_trial_flags
     reset_visual_state = context.reset_visual_state
+    attach_completion_api()
 end
 
 return M

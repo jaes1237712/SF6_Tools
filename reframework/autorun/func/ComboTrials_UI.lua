@@ -67,9 +67,18 @@ local UI_THEME = {
 local _dropdown_highlight_idx = nil
 local _dropdown_scroll_needed = false
 
-local function combo_openable(label, current_idx, items, force_open, btn_width)
+local function combo_openable(label, current_idx, items, force_open, btn_width, completion_paths)
     local popup_id = label .. "_popup"
     local preview = (items and items[current_idx]) or "---"
+
+    -- Completed-trial markers (SF6_TOOLS_CC progression feature)
+    local mark_completed = nil
+    if completion_paths and file_system and file_system.is_trial_completed then
+        mark_completed = function(i)
+            return completion_paths[i] and file_system.is_trial_completed(completion_paths[i])
+        end
+        if mark_completed(current_idx) then preview = "* " .. preview end
+    end
 
     -- Capture button screen position before drawing it
     local win_pos = imgui.get_window_pos()
@@ -132,7 +141,9 @@ local function combo_openable(label, current_idx, items, force_open, btn_width)
 
         for i = 1, #items do
             local is_highlighted = (i == _dropdown_highlight_idx)
-            if imgui.menu_item(items[i], "", is_highlighted, true) then
+            local item_label = items[i]
+            if mark_completed and mark_completed(i) then item_label = "* " .. item_label end
+            if imgui.menu_item(item_label, "", is_highlighted, true) then
                 new_idx = i
                 changed = true
             end
@@ -502,7 +513,7 @@ local function draw_single_line_content()
             imgui.pop_item_width()
         else
             local should_open = (_G.ComboTrials_OpenDropdown == true)
-            local f1_changed, new_idx1 = combo_openable("##FilesP1", file_system.selected_file_idx_p1, file_system.saved_combos_display_p1, should_open, dd_w)
+            local f1_changed, new_idx1 = combo_openable("##FilesP1", file_system.selected_file_idx_p1, file_system.saved_combos_display_p1, should_open, dd_w, file_system.saved_combos_paths_p1)
             if f1_changed then
                 file_system.selected_file_idx_p1 = new_idx1
                 load_and_start_trial(0)
@@ -524,7 +535,7 @@ local function draw_single_line_content()
             imgui.pop_item_width()
         else
             local should_open = (_G.ComboTrials_OpenDropdown == true)
-            local f1_changed, new_idx1 = combo_openable("##FilesP1", file_system.selected_file_idx_p1, file_system.saved_combos_display_p1, should_open, dd_w)
+            local f1_changed, new_idx1 = combo_openable("##FilesP1", file_system.selected_file_idx_p1, file_system.saved_combos_display_p1, should_open, dd_w, file_system.saved_combos_paths_p1)
             if f1_changed then
                 file_system.selected_file_idx_p1 = new_idx1
                 load_and_start_trial(0)
@@ -653,7 +664,7 @@ local function draw_combo_trials_content(is_floating)
         imgui.pop_item_width()
     else
         local should_open = (_G.ComboTrials_OpenDropdown == true)
-        local f1_changed, new_idx1 = combo_openable("##FilesP1", file_system.selected_file_idx_p1, file_system.saved_combos_display_p1, should_open, col1_w)
+        local f1_changed, new_idx1 = combo_openable("##FilesP1", file_system.selected_file_idx_p1, file_system.saved_combos_display_p1, should_open, col1_w, file_system.saved_combos_paths_p1)
         if f1_changed then
             file_system.selected_file_idx_p1 = new_idx1
             load_and_start_trial(0)
@@ -817,7 +828,11 @@ re.on_frame(function()
     end
     _was_bars_drawn = bars_now
 
-    if _G.FlowMapID ~= 10 and not _G.IsInReplay and _G.CurrentTrainerMode ~= 4 then
+    -- Scene gate (SF6_TOOLS_CC fix): TrainingModeActive catches the case where
+    -- a match found from training leaves CurrentTrainerMode stale at 4
+    local in_replay_ctx = (_G.FlowMapID == 10) or _G.IsInReplay
+    local in_training_ctx = (_G.CurrentTrainerMode == 4) and (_G.TrainingModeActive ~= false)
+    if not in_replay_ctx and not in_training_ctx then
         sf6_menu_state.active = false
         _G.ComboTrials_HideNativeHUD = false
         _G.ComboTrialsD2DEnabled = false
@@ -1178,7 +1193,7 @@ local function _ctui_draw_live_positions()
 end
 
 local function draw_combo_trials_menu_ui()
-    if _G.CurrentTrainerMode ~= 4 then return end
+    if _G.CurrentTrainerMode ~= 4 or _G.TrainingModeActive == false then return end
     if imgui.tree_node("TRAINING COMBO TRIALS") then
         local p_state = players[ui_state.viewed_player]
         imgui.spacing()
@@ -1230,6 +1245,24 @@ local function draw_combo_trials_menu_ui()
 
             c, v = imgui.checkbox("Show Combo Counter", d2d_cfg.show_combo_count); if c then
                 d2d_cfg.show_combo_count = v; changed = true
+            end
+            imgui.spacing()
+
+            imgui.text_colored("--- Trial Progression ---", COLORS.Cyan)
+            c, v = imgui.checkbox("Auto Next Combo On Success", d2d_cfg.auto_next_trial ~= false); if c then
+                d2d_cfg.auto_next_trial = v; changed = true
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("After a manual success: automatically load and start the next combo in the list.\nCompleted combos get a * marker in the dropdown. DEMO finishes never count.")
+            end
+            c, v = imgui.checkbox("Auto Retry On Fail", d2d_cfg.auto_retry_on_fail ~= false); if c then
+                d2d_cfg.auto_retry_on_fail = v; changed = true
+            end
+            if imgui.is_item_hovered() then
+                imgui.set_tooltip("After the fail banner: automatically reset the trial.\nDisabled: the trial stops, restart it manually.")
+            end
+            if file_system.clear_completed_trials and styled_button("CLEAR COMPLETED MARKERS", UI_THEME.btn_neutral) then
+                file_system.clear_completed_trials()
             end
             imgui.spacing()
 
