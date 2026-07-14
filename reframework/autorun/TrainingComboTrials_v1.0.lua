@@ -2762,6 +2762,12 @@ local function ct_handle_web_commands()
             d2d_cfg.forced_position_idx = d2d_cfg.forced_position_idx == 3 and 2 or 3
             if apply_forced_position then apply_forced_position() end
         end
+        if cmd == "refresh_combos" then
+            pcall(function()
+                ComboTrials_Files.refresh_combo_list_preserve_selection()
+                ct_ticker("COMBO LIST REFRESHED")
+            end)
+        end
         if type(cmd) == "string" and cmd:match("^select_file:") then
             local idx = tonumber(cmd:match("^select_file:(%d+)"))
             if idx then
@@ -4222,6 +4228,19 @@ end
 re.on_frame(function()
     pcall(_ct_track_live_combo)
     ct_handle_web_commands()
+
+    -- External combo file detection (mobile imports): signature check every
+    -- 300 frames, only with the remote loaded and no trial/recording active
+    if _G._remote_control_loaded and _G.CurrentTrainerMode == 4
+        and engine_frame_count % 300 == 87
+        and not trial_state.is_playing and not trial_state.is_recording
+        and not (demo_state and demo_state.is_playing) then
+        pcall(function()
+            if ComboTrials_Files.check_external_changes() then
+                ct_ticker("COMBO LIST UPDATED (EXTERNAL)")
+            end
+        end)
+    end
 
     -- Export globals for web bridge
     local _p_idx = trial_state.playing_player or 0

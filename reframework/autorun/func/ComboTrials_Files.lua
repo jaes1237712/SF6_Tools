@@ -109,6 +109,76 @@ function M.refresh_combo_list(recent_saved_player)
 end
 
 -- =========================================================
+-- EXTERNAL CHANGE DETECTION (signature-based, SF6_TOOLS_CC-compatible)
+-- Detects combo files added/removed by external writers (mobile import
+-- via the tray, manual drops) without rescanning on a timer for everyone:
+-- the caller decides when to poll (gated + low frequency).
+-- =========================================================
+local function glob_combo_paths(char_name)
+    if not char_name or char_name == "Unknown" then return {} end
+    local files = fs.glob("TrainingComboTrials_data\\\\CustomCombos\\\\" .. char_name .. "\\\\.*json")
+    return files or {}
+end
+
+function M.build_combo_list_signature()
+    local parts = {}
+    for player_idx = 0, 1 do
+        local p_state = players[player_idx]
+        local char_name = p_state and p_state.profile_name or nil
+        if char_name and char_name ~= "Unknown" then
+            local files = glob_combo_paths(char_name)
+            table.sort(files)
+            parts[#parts + 1] = char_name .. ":" .. #files .. ":" .. table.concat(files, "|")
+        end
+    end
+    return table.concat(parts, ";;")
+end
+
+-- Refresh the lists while keeping each side's current selection (by path).
+-- Never loads a different combo than the one currently selected.
+function M.refresh_combo_list_preserve_selection()
+    local kept = {}
+    for player_idx = 0, 1 do
+        local paths = (player_idx == 0) and file_system.saved_combos_paths_p1 or file_system.saved_combos_paths_p2
+        local idx = (player_idx == 0) and (file_system.selected_file_idx_p1 or 1) or (file_system.selected_file_idx_p2 or 1)
+        kept[player_idx] = paths and paths[idx] or nil
+    end
+
+    local prev_pending = file_system._pending_select_path
+    file_system._pending_select_path = kept[0] or kept[1] or true
+    M.refresh_combo_list()
+    file_system._pending_select_path = prev_pending
+
+    for player_idx = 0, 1 do
+        local old_path = kept[player_idx]
+        if old_path then
+            local paths = (player_idx == 0) and file_system.saved_combos_paths_p1 or file_system.saved_combos_paths_p2
+            local new_idx = nil
+            for i, path in ipairs(paths) do
+                if path == old_path then new_idx = i break end
+            end
+            if new_idx then
+                if player_idx == 0 then file_system.selected_file_idx_p1 = new_idx
+                else file_system.selected_file_idx_p2 = new_idx end
+            end
+        end
+    end
+end
+
+-- Returns true when an external change was detected (and the list refreshed)
+function M.check_external_changes()
+    local sig = M.build_combo_list_signature()
+    if file_system._list_signature == nil then
+        file_system._list_signature = sig
+        return false
+    end
+    if sig == file_system._list_signature then return false end
+    file_system._list_signature = sig
+    M.refresh_combo_list_preserve_selection()
+    return true
+end
+
+-- =========================================================
 -- COMPLETED TRIALS TRACKING (runtime sidecar, SF6_TOOLS_CC-compatible)
 -- API attached to file_system so main file and UI share it.
 -- Sidecar lives OUTSIDE the per-character combo directories.
