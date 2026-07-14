@@ -195,14 +195,49 @@ pcall(function()
     end
 end)
 
-local function build_auto_xt_meta()
+-- xt.combo_trial format v2 (joint spec with SF6_TOOLS_CC — docs/COMBO_JSON_SPEC.md)
+local XT_RECORDER_VERSION = "2.9.0"
+
+local function iso8601_now()
+    local t = os.date("%Y-%m-%dT%H:%M:%S")
+    local tz = os.date("%z") or ""
+    if #tz == 5 then tz = tz:sub(1, 3) .. ":" .. tz:sub(4) end
+    return t .. tz
+end
+
+-- Reads P1's control type from the select menu (0 = classic, 1 = modern)
+local function read_control_mode()
+    local mode = "classic"
+    pcall(function()
+        local tm = sdk.get_managed_singleton("app.training.TrainingManager")
+        local sm = tm:get_field("_tData"):get_field("SelectMenu")
+        local pd = sm and sm.PlayerDatas and sm.PlayerDatas[0]
+        local v = pd and tonumber(pd.InputType)
+        if v == 1 then mode = "modern" end
+    end)
+    return mode
+end
+
+local function build_auto_xt_meta(sequence)
+    local now = iso8601_now()
+    local step_notes = {}
+    for i = 1, (sequence and #sequence or 0) do step_notes[i] = "" end
     return {
         title = "",
         note = "",
         author = xt_settings.default_author or "Anonymous",
         tags = {},
-        created_at = os.date("%Y-%m-%d %H:%M:%S"),
-        schema = 1
+        step_notes = step_notes,
+        language = xt_settings.language or "en",
+        control_mode = read_control_mode(),
+        created_at = now,
+        updated_at = now,
+        versions = {
+            game = { id = "sf6" },
+            recorder = { id = "wtt", version = XT_RECORDER_VERSION },
+            json = { id = "xt.combo_trial", version = "2.0.0" }
+        },
+        schema = 2
     }
 end
 
@@ -1175,9 +1210,20 @@ local function apply_trial_vital()
         trial_state._pending_victim_hp = hp
     end
 
-    if cs then
+    if cs and (cs.drive_used ~= nil or cs.super_used ~= nil) then
+        -- WTT trial UX: start with exactly the gauge the combo consumes
         trial_state._pending_attacker_drive = cs.drive_used or 0
         trial_state._pending_attacker_super = cs.super_used or 0
+    else
+        -- Interop fallback (spec v2): recorded starting resources (1:1)
+        local s1 = trial_state.sequence[1]
+        local sc = s1 and s1.scene_state
+        local atk_side = (s1 and s1.recorded_by == 1) and "p2" or "p1"
+        local res = sc and sc.players and sc.players[atk_side] and sc.players[atk_side].resources
+        if res then
+            trial_state._pending_attacker_drive = res.drive or 0
+            trial_state._pending_attacker_super = res.super or 0
+        end
     end
 
     pcall(function()
@@ -1524,11 +1570,64 @@ function unique_resources.capture_by_side()
 end
 
 function unique_resources.capture_scene_state(recorded_by)
-    local players_state = unique_resources.capture_by_side()
-    if not players_state then return nil end
+    -- v2 (joint spec): always captured — resources + status are playback
+    -- preconditions for every combo, unique data only for install chars
+    local players_state = unique_resources.capture_by_side() or {}
+
+    for player_idx = 0, 1 do
+        local side_key = player_idx == 0 and "p1" or "p2"
+        local side = players_state[side_key] or {}
+        if side.fighter_id == nil then
+            side.fighter_id = unique_resources.read_training_fighter_id(player_idx)
+        end
+        pcall(function()
+            local p = (player_idx == 0) and GS.p1 or GS.p2
+            if not p then return end
+
+            local super = 0
+            pcall(function()
+                local BT = _td_gBattle:get_field("Team"):get_data(nil)
+                if BT and BT.mcTeam and BT.mcTeam[player_idx] then
+                    super = BT.mcTeam[player_idx].mSuperGauge or 0
+                end
+            end)
+            side.resources = {
+                hp = p.vital_new,
+                drive = p.focus_new,
+                super = super
+            }
+
+            local pose = tonumber(tostring(p:get_field("pose_st"))) or 0
+            local stance = "standing"
+            if pose == 1 then stance = "crouching"
+            elseif pose == 2 then stance = "airborne" end
+
+            local stunned = false
+            pcall(function()
+                local eng = p.mpActParam.ActionPart._Engine
+                if eng then
+                    local aid = eng:get_ActionID()
+                    stunned = (aid == 293 or aid == 294)
+                end
+            end)
+
+            local burnout = false
+            pcall(function()
+                local tm2 = sdk.get_managed_singleton("app.training.TrainingManager")
+                local ps2 = tm2:get_field("_tData"):get_field("ParameterSetting")
+                local pdd = ps2 and ps2.PlayerDatas and ps2.PlayerDatas[player_idx]
+                if pdd then
+                    burnout = (pdd.Is_DG_Break == true or pdd.Is_DG_Break == 1)
+                end
+            end)
+
+            side.status = { burnout = burnout, stunned = stunned, stance = stance }
+        end)
+        players_state[side_key] = side
+    end
 
     return {
-        schema = "xt.combo_trial.scene.v1",
+        schema = "xt.combo_trial.scene.v2",
         capture_mode = "portable",
         recorded_by = recorded_by,
         players = players_state
@@ -2264,6 +2363,17 @@ local function start_trial(player_idx)
 
     -- APPLY UNIQUE RESOURCES recorded with the combo (Jamie drinks etc.)
     unique_resources.apply_recorded()
+
+    -- Control mode check (spec v2): recorded inputs are not portable across modes
+    pcall(function()
+        local meta = trial_state.sequence and trial_state.sequence[1] and trial_state.sequence[1]._xt_meta
+        local file_mode = meta and meta.control_mode
+        if file_mode and file_mode ~= read_control_mode() then
+            if _G.show_custom_ticker then
+                _G.show_custom_ticker("WARNING: COMBO RECORDED IN " .. tostring(file_mode):upper() .. " CONTROLS", 0.3)
+            end
+        end
+    end)
 
     -- Guard: After 1st Hit (2) at trial start
     set_dummy_guard_type(2)
@@ -4435,7 +4545,7 @@ function save_trial_sequence()
         trial_state._rec_hit_type = nil
     end
 
-    local meta = build_auto_xt_meta()
+    local meta = build_auto_xt_meta(trial_state.sequence)
     if type(trial_state.sequence[1]) == "table" then
         trial_state.sequence[1]._xt_meta = meta
         if trial_state._raw_rec_buffer and #trial_state._raw_rec_buffer > 0 then
