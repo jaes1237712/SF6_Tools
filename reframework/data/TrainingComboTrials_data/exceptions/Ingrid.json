@@ -114,7 +114,7 @@
         "ignore": false,
         "ignore_prev_frames": 5,
         "is_holdable": false,
-        "override_name": "j.MP+HP (Lvl 1)"
+        "override_name": "j.214+PP (Lvl 1)"
     },
     "1076": {
         "absorb_ids": "",
@@ -123,7 +123,7 @@
         "ignore": false,
         "ignore_prev_frames": 5,
         "is_holdable": false,
-        "override_name": "j.214+MP+HP (Lvl 2)"
+        "override_name": "j.214+PP (Lvl 2)"
     },
     "1088": {
         "absorb_ids": "",
@@ -206,7 +206,7 @@
         "ignore": false,
         "ignore_prev_frames": 5,
         "is_holdable": true,
-        "override_name": "214214+MP"
+        "override_name": "214214+MP（二符纹）"
     },
     "1218": {
         "absorb_ids": "",
@@ -217,7 +217,7 @@
         "ignore": false,
         "ignore_prev_frames": 5,
         "is_holdable": true,
-        "override_name": "214214+MP"
+        "override_name": "214214+MP（一符纹）"
     },
     "1219": {
         "absorb_ids": "",
@@ -227,7 +227,7 @@
         "ignore_prev_frames": 100,
         "ignore_prev_id": 1217,
         "is_holdable": false,
-        "override_name": "214214+MP"
+        "override_name": "214214+MP（零符纹）"
     },
     "1222": {
         "absorb_ids": "",
@@ -238,7 +238,7 @@
         "ignore": false,
         "ignore_prev_frames": 5,
         "is_holdable": true,
-        "override_name": "214214+LP"
+        "override_name": "214214+LP（二符纹）"
     },
     "1223": {
         "absorb_ids": "",
@@ -250,7 +250,7 @@
         "ignore_prev_frames": 100,
         "ignore_prev_id": 1222,
         "is_holdable": true,
-        "override_name": "214214+LP"
+        "override_name": "214214+LP（一符纹）"
     },
     "1224": {
         "absorb_ids": "",
@@ -263,7 +263,7 @@
             1222
         ],
         "is_holdable": false,
-        "override_name": "214214+LP"
+        "override_name": "214214+LP（零符纹）"
     },
     "1227": {
         "absorb_ids": "",
@@ -274,7 +274,7 @@
         "ignore": false,
         "ignore_prev_frames": 5,
         "is_holdable": true,
-        "override_name": "214214+HP"
+        "override_name": "214214+HP（二符纹）"
     },
     "1228": {
         "absorb_ids": "",
@@ -286,7 +286,7 @@
         "ignore_prev_frames": 100,
         "ignore_prev_id": 1227,
         "is_holdable": true,
-        "override_name": "214214+HP"
+        "override_name": "214214+HP（一符纹）"
     },
     "1229": {
         "absorb_ids": "",
@@ -299,7 +299,7 @@
             1227
         ],
         "is_holdable": false,
-        "override_name": "214214+HP"
+        "override_name": "214214+HP（零符纹）"
     },
     "606": {
         "absorb_ids": "",
@@ -476,5 +476,32 @@
         "ignore_prev_frames": 5,
         "is_holdable": false,
         "override_name": "214+MP/HP"
+    },
+    "990": {
+        "absorb_ids": "",
+        "force": false,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "214+HP"
+    },
+    "995": {
+        "absorb_ids": "",
+        "force": false,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "214+HP"
+    },
+    "1002": {
+        "absorb_ids": "",
+        "force": false,
+        "hold_partial_check": true,
+        "ignore": false,
+        "ignore_prev_frames": 5,
+        "is_holdable": false,
+        "override_name": "214+PP"
     }
 }

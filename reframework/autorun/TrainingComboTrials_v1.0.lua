@@ -4103,6 +4103,30 @@ local function ct_player_process_actions(p_idx, p_state, actions_to_process)
     				end
 
             ::continue_to_log::
+            -- Raw input fallback for UNKNOWN automatic actions: show what was
+            -- actually pressed so unmapped install-variant IDs (Sumo Spirit
+            -- normals etc.) are easy to identify and except. Uses the same
+            -- input-history search as intentional actions (facing-corrected
+            -- direction, survives diagonals dropped at spawn frame).
+            if not is_intentional and real_input_str == "None" and act_name == "Unknown" then
+                local raw_match = nil
+                for i = #p_state.input_history_queue, 1, -1 do
+                    local entry = p_state.input_history_queue[i]
+                    if (engine_frame_count - entry.frame_tick) <= 15 and (entry.mask & 0xFFF0) > 0 then
+                        raw_match = entry
+                        break
+                    end
+                end
+                if raw_match then
+                    local raw_btn = decode_button_mask(raw_match.mask)
+                    local raw = raw_match.dir or ""
+                    if raw_btn ~= "" then
+                        raw = raw .. (raw ~= "" and "+" or "") .. raw_btn
+                    end
+                    if raw ~= "" then real_input_str = raw end
+                end
+            end
+
             table.insert(p_state.log, 1, {
                 dual_threshold = dual_threshold,
                 id = act_id,

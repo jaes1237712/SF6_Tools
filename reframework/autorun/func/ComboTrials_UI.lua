@@ -1921,6 +1921,9 @@ local function draw_combo_trials_menu_ui()
                             imgui.text_colored(line, COLORS.DarkGrey)
                         else
                             local line = string.format("AUTOMATIC | %s (ID: %d)", log.name, log.id)
+                            if log.real_input and log.real_input ~= "None" and log.real_input ~= "Ghost" then
+                                line = line .. "  -> Raw: " .. log.real_input
+                            end
                             imgui.text_colored(line, COLORS.DarkGrey)
                         end
                     end
