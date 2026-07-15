@@ -1,0 +1,778 @@
+{
+  "_meta": {
+    "schema": "xt.modern_display.v1",
+    "character": "Alex",
+    "updated_at": "2026-07-04",
+    "description": "Modern control display mapping for Alex"
+  },
+  "17": {
+    "classic_display": "5656 + 6",
+    "modern_display": "5656 + 6",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "前方ステップ",
+    "category": "F_DASH",
+    "official_web_id": "600",
+    "note": "Generated from Capcom official frame data."
+  },
+  "18": {
+    "classic_display": "5454 + 4",
+    "modern_display": "5454 + 4",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "後方ステップ",
+    "category": "B_DASH",
+    "official_web_id": "601",
+    "note": "Generated from Capcom official frame data."
+  },
+  "34": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "480": {
+    "classic_display": "MPMK",
+    "modern_display": "DP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ドライブパリィ",
+    "category": "PARRY",
+    "official_web_id": "605",
+    "note": "Generated from Capcom official frame data."
+  },
+  "500": {
+    "classic_display": "（ドライブパリィ中に）5656 + MPMK + 6",
+    "modern_display": "（ドライブパリィ中に）5656 + DP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "パリィドライブラッシュ",
+    "category": "DRIVE_STEP",
+    "official_web_id": "608",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "501": {
+    "classic_display": "（必殺技キャンセル可能な攻撃ヒット中に）5656 + 6",
+    "modern_display": "（必殺技キャンセル可能な攻撃ヒット中に）5656 + 6 or (N or 6) + DP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "キャンセルドライブラッシュ",
+    "category": "DRIVE_STEP",
+    "official_web_id": "609",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "600": {
+    "classic_display": "LP",
+    "modern_display": "弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "立ち弱P（クイックジャブ）",
+    "category": "NORMAL",
+    "official_web_id": "100",
+    "note": "Generated from Capcom official frame data."
+  },
+  "601": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "602": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "604": {
+    "classic_display": "MP",
+    "modern_display": "中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "立ち中P（ボディーブロー）",
+    "category": "NORMAL",
+    "official_web_id": "102",
+    "note": "Generated from Capcom official frame data."
+  },
+  "606": {
+    "classic_display": "MP > HP",
+    "modern_display": "中 > 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "パームストライク",
+    "category": "NORMAL",
+    "official_web_id": "220",
+    "note": "Generated from Capcom official frame data."
+  },
+  "608": {
+    "classic_display": "HP",
+    "modern_display": "AUTO + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "立ち強P（フェイスクラッシャー）",
+    "category": "NORMAL",
+    "official_web_id": "104",
+    "note": "Generated from Capcom official frame data."
+  },
+  "612": {
+    "classic_display": "LK",
+    "modern_display": "AUTO + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "立ち弱K（ローキック）",
+    "category": "NORMAL",
+    "official_web_id": "101",
+    "note": "Generated from Capcom official frame data."
+  },
+  "614": {
+    "classic_display": "MK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": "立ち中K（ミドルキック）",
+    "category": "NORMAL",
+    "official_web_id": "103",
+    "note": "No modern command found in official data."
+  },
+  "616": {
+    "classic_display": "HK",
+    "modern_display": "強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "立ち強K（ロングキック）",
+    "category": "NORMAL",
+    "official_web_id": "106",
+    "note": "Generated from Capcom official frame data."
+  },
+  "621": {
+    "classic_display": "2 + LP",
+    "modern_display": "2 + 弱 > 2 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "しゃがみ弱P（ロークロー）",
+    "category": "NORMAL",
+    "official_web_id": "108",
+    "note": "Generated from Capcom official frame data."
+  },
+  "622": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "623": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "625": {
+    "classic_display": "2 + MP",
+    "modern_display": "AUTO + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "しゃがみ中P（地獄突き）",
+    "category": "NORMAL",
+    "official_web_id": "110",
+    "note": "Generated from Capcom official frame data."
+  },
+  "628": {
+    "classic_display": "2 + HP",
+    "modern_display": "2 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "しゃがみ強P（ビッグスワイプ）",
+    "category": "NORMAL",
+    "official_web_id": "112",
+    "note": "Generated from Capcom official frame data."
+  },
+  "633": {
+    "classic_display": "2 + LK",
+    "modern_display": "2 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "しゃがみ弱K（グランドロー）",
+    "category": "NORMAL",
+    "official_web_id": "109",
+    "note": "Generated from Capcom official frame data."
+  },
+  "634": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "635": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "636": {
+    "classic_display": "2 + LK > 2 + HK",
+    "modern_display": "2 + 弱 > 2 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ツイストドロップ",
+    "category": "NORMAL",
+    "official_web_id": "221",
+    "note": "Generated from Capcom official frame data."
+  },
+  "638": {
+    "classic_display": "2 + MK",
+    "modern_display": "2 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "しゃがみ中K（シンキック）",
+    "category": "NORMAL",
+    "official_web_id": "111",
+    "note": "Generated from Capcom official frame data."
+  },
+  "640": {
+    "classic_display": null,
+    "modern_display": "3 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ラウンドキック",
+    "category": "NORMAL",
+    "official_web_id": "218",
+    "note": "Generated from Capcom official frame data."
+  },
+  "645": {
+    "classic_display": "空中 LP",
+    "modern_display": "空中 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ジャンプ弱P（ハイジャブ）",
+    "category": "AIR",
+    "official_web_id": "114",
+    "note": "Generated from Capcom official frame data."
+  },
+  "646": {
+    "classic_display": "空中 MP",
+    "modern_display": "空中 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ジャンプ中P（フライングニーチョップ）",
+    "category": "AIR",
+    "official_web_id": "116",
+    "note": "Generated from Capcom official frame data."
+  },
+  "647": {
+    "classic_display": "空中 HP",
+    "modern_display": "空中 AUTO + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ジャンプ強P（スカイハンマー）",
+    "category": "AIR",
+    "official_web_id": "118",
+    "note": "Generated from Capcom official frame data."
+  },
+  "648": {
+    "classic_display": "空中 LK",
+    "modern_display": "空中 AUTO + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ジャンプ弱K（フライングニー）",
+    "category": "AIR",
+    "official_web_id": "115",
+    "note": "Generated from Capcom official frame data."
+  },
+  "649": {
+    "classic_display": "空中 MK",
+    "modern_display": "空中 AUTO + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ジャンプ中K（ニールキック）",
+    "category": "AIR",
+    "official_web_id": "117",
+    "note": "Generated from Capcom official frame data."
+  },
+  "650": {
+    "classic_display": "空中 HK",
+    "modern_display": "空中 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ジャンプ強K（ドロップキック）",
+    "category": "AIR",
+    "official_web_id": "119",
+    "note": "Generated from Capcom official frame data."
+  },
+  "653": {
+    "classic_display": "空中 2 + HP",
+    "modern_display": "空中 2 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "フライングクロスチョップ",
+    "category": "AIR",
+    "official_web_id": "219",
+    "note": "Generated from Capcom official frame data."
+  },
+  "670": {
+    "classic_display": "6 + MP",
+    "modern_display": "6 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "チョップ",
+    "category": "NORMAL",
+    "official_web_id": "216",
+    "note": "Generated from Capcom official frame data."
+  },
+  "671": {
+    "classic_display": "4 + MK",
+    "modern_display": "4 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "オブリークスタンプ",
+    "category": "NORMAL",
+    "official_web_id": "217",
+    "note": "Generated from Capcom official frame data."
+  },
+  "672": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": "マグナバンカー",
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "715": {
+    "classic_display": "（近距離で）N or 6 + LPLK",
+    "modern_display": "（近距離で）N or 6 + 弱中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "アームロック",
+    "category": "NORMAL",
+    "official_web_id": "500",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "850": {
+    "classic_display": "（ガード中 or ドライブパリィ成立中に）6 + HPHK",
+    "modern_display": "（ガード中 or ドライブパリィ成立中に）6 + DI",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "[ガード時]ドライブリバーサル（ヘッドバッド）",
+    "category": "SPECIAL",
+    "official_web_id": "603",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "852": {
+    "classic_display": "（起き上がり時に）6 + HPHK",
+    "modern_display": "（起き上がり時に）6 + DI",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "[起き上がり時]ドライブリバーサル（ヘッドバッド）",
+    "category": "SPECIAL",
+    "official_web_id": "604",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "855": {
+    "classic_display": "HPHK",
+    "modern_display": "DI",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ドライブインパクト（レッグラリアート）",
+    "category": "SPECIAL",
+    "official_web_id": "602",
+    "note": "Generated from Capcom official frame data."
+  },
+  "900": {
+    "classic_display": "236 + LP",
+    "modern_display": "236 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "弱 フラッシュアックス",
+    "category": "SPECIAL",
+    "official_web_id": "300",
+    "note": "Generated from Capcom official frame data."
+  },
+  "901": {
+    "classic_display": "236 + MP",
+    "modern_display": "SP/236 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "中 フラッシュアックス",
+    "category": "SPECIAL",
+    "official_web_id": "301",
+    "note": "Generated from Capcom official frame data."
+  },
+  "902": {
+    "classic_display": "236 + HP",
+    "modern_display": "236 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "フラッシュチョップ",
+    "category": "SPECIAL",
+    "official_web_id": "302",
+    "note": "Generated from Capcom official frame data."
+  },
+  "903": {
+    "classic_display": "236 + LPMPHP",
+    "modern_display": "AUTO + SP/236 + 攻撃二つ",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "OD フラッシュチョップ",
+    "category": "SPECIAL",
+    "official_web_id": "303",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "910": {
+    "classic_display": "（近距離で）63214 + LP",
+    "modern_display": "（近距離で）63214 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "弱 パワーボム",
+    "category": "SPECIAL",
+    "official_web_id": "308",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "911": {
+    "classic_display": "（近距離で）63214 + MP",
+    "modern_display": "（近距離で）4 + SP/63214 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "中 パワーボム",
+    "category": "SPECIAL",
+    "official_web_id": "309",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "912": {
+    "classic_display": "（近距離で）63214 + HP",
+    "modern_display": "（近距離で）63214 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "強 パワーボム",
+    "category": "SPECIAL",
+    "official_web_id": "310",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "913": {
+    "classic_display": "（近距離で）63214 + LPMPHP",
+    "modern_display": "（近距離で）4 + AUTO + SP/63214 + 攻撃二つ",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "OD パワーボム",
+    "category": "SPECIAL",
+    "official_web_id": "311",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "923": {
+    "classic_display": "（背面から近距離で）63214 + LP | MP | HP",
+    "modern_display": "（背面から近距離で）4 + SP/63214 + 攻撃",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "パワードロップ",
+    "category": "SPECIAL",
+    "official_web_id": "312",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "928": {
+    "classic_display": "（背面から近距離で）63214 + LPMPHP",
+    "modern_display": "（背面から近距離で）4 + AUTO + SP/63214 + 攻撃",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "OD パワードロップ",
+    "category": "SPECIAL",
+    "official_web_id": "313",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "936": {
+    "classic_display": "623 + LK",
+    "modern_display": "6 + SP/623 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "弱 エアニースマッシュ",
+    "category": "SPECIAL",
+    "official_web_id": "304",
+    "note": "Generated from Capcom official frame data."
+  },
+  "937": {
+    "classic_display": "623 + MK",
+    "modern_display": "623 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "中 エアニースマッシュ",
+    "category": "SPECIAL",
+    "official_web_id": "305",
+    "note": "Generated from Capcom official frame data."
+  },
+  "938": {
+    "classic_display": "623 + HK",
+    "modern_display": "2 + SP/623 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "強 エアニースマッシュ",
+    "category": "SPECIAL",
+    "official_web_id": "306",
+    "note": "Generated from Capcom official frame data."
+  },
+  "939": {
+    "classic_display": "623 + LKMKHK",
+    "modern_display": "6 or 2 + AUTO + SP/623 + 攻撃二つ",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "OD エアニースマッシュ",
+    "category": "SPECIAL",
+    "official_web_id": "307",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "957": {
+    "classic_display": "2 + LPMPHP",
+    "modern_display": "2 + 中強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ブレイカー・スタンス",
+    "category": "SPECIAL",
+    "official_web_id": "200",
+    "note": "Generated from Capcom official frame data."
+  },
+  "958": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": "クラウチング（フラッシュエルボー派生）",
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "959": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": "クラウチング",
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "962": {
+    "classic_display": "（ブレイカー・スタンス中に）6",
+    "modern_display": "（ブレイカー・スタンス中に）6",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ステップイン",
+    "category": "NORMAL",
+    "official_web_id": "201",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "964": {
+    "classic_display": "（ブレイカー・スタンス中に）4",
+    "modern_display": "（ブレイカー・スタンス中に）4",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ステップアウト",
+    "category": "NORMAL",
+    "official_web_id": "202",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "967": {
+    "classic_display": "（ブレイカー・スタンス or ステップイン中に）6 + LP",
+    "modern_display": "（ブレイカー・スタンス or ステップイン中に）6 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "弱 スラッシュエルボー",
+    "category": "NORMAL",
+    "official_web_id": "203",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "970": {
+    "classic_display": "（ブレイカー・スタンス中に）LP",
+    "modern_display": "（ブレイカー・スタンス中に）弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "パームコンタクト",
+    "category": "NORMAL",
+    "official_web_id": "206",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "971": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": "クラウチング弱P",
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "973": {
+    "classic_display": "（ブレイカー・スタンス中に）MP",
+    "modern_display": "（ブレイカー・スタンス中に）中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ショルダーランチャー",
+    "category": "NORMAL",
+    "official_web_id": "207",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "976": {
+    "classic_display": "（ブレイカー・スタンス中に）HP",
+    "modern_display": "（ブレイカー・スタンス中に）強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ヘビーラリアット",
+    "category": "NORMAL",
+    "official_web_id": "208",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "978": {
+    "classic_display": "（ブレイカー・スタンス中に）LK",
+    "modern_display": "（ブレイカー・スタンス中に）2 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "タクティカルリープ",
+    "category": "NORMAL",
+    "official_web_id": "210",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "979": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": "リープ",
+    "category": "NORMAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  },
+  "980": {
+    "classic_display": "（ブレイカー・スタンス中に）MK",
+    "modern_display": "（ブレイカー・スタンス中に）2 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "エアスタンピート",
+    "category": "NORMAL",
+    "official_web_id": "211",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "981": {
+    "classic_display": "（ブレイカー・スタンス中に）HK",
+    "modern_display": "（ブレイカー・スタンス中に）2 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "スイープコンビネーション（1段目）",
+    "category": "NORMAL",
+    "official_web_id": "212",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "982": {
+    "classic_display": "（ブレイカー・スタンス中に）HK > HK",
+    "modern_display": "（ブレイカー・スタンス中に）2 + 強 > 2 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "スイープコンビネーション（2段目）",
+    "category": "NORMAL",
+    "official_web_id": "213",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "987": {
+    "classic_display": "（ブレイカー・スタンス中に）（近距離で）LPLK",
+    "modern_display": "（ブレイカー・スタンス中に）（近距離で）弱中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "ハイパーリフト",
+    "category": "NORMAL",
+    "official_web_id": "214",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "992": {
+    "classic_display": "（ブレイカー・スタンス中に）（立ち状態の相手に対して近距離で）2 + LPLK",
+    "modern_display": "（ブレイカー・スタンス中に）（立ち状態の相手に対して近距離で）2 + 弱中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "デンジャラスアプローチ",
+    "category": "NORMAL",
+    "official_web_id": "215",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "1200": {
+    "classic_display": "236236 + LK | MK | HK",
+    "modern_display": "5 or 6 + 強SP/236236 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "SA1 レイジングスピアー",
+    "category": "SUPER",
+    "official_web_id": "400",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1208": {
+    "classic_display": "214214 + LP | MP | HP",
+    "modern_display": "4 + 強SP/214214 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "SA2 スレッジクロスハンマー",
+    "category": "SUPER",
+    "official_web_id": "401",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1215": {
+    "classic_display": "（ODパワードロップ中に）LPMPHP",
+    "modern_display": "（ODパワードロップ中に）強SP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "SA2 オメガウィングバスター",
+    "category": "SUPER",
+    "official_web_id": "402",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "1230": {
+    "classic_display": "236236 + LP | MP | HP",
+    "modern_display": "2 + 強SP/214214 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "SA3 ファイナルキャプチュード",
+    "category": "SUPER",
+    "official_web_id": "403",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1242": {
+    "classic_display": "（体力25%以下で）236236 + LP | MP | HP",
+    "modern_display": "（体力25%以下で）2 + 強SP/214214 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "move_name": "CA ファイナルキャプチュード",
+    "category": "SUPER",
+    "official_web_id": "404",
+    "note": "Generated from Capcom official frame data. Needs review: command contains generalized or contextual notation."
+  },
+  "1495": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "move_name": null,
+    "category": "SPECIAL",
+    "official_web_id": null,
+    "note": "No modern command found in official data."
+  }
+}

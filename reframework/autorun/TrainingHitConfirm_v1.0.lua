@@ -1377,3 +1377,32 @@ local apply_force_invisible; apply_force_invisible = function(control, path, dep
         child = child:call("get_Next")
     end
 end
+
+
+-- Shared hotkey framework: register the hit-confirm scope (additive,
+-- disabled by default; existing behavior unchanged)
+do
+    local ok, HitConfirmHotkeys = pcall(require, "func/HitConfirm_Hotkeys")
+    local ok2, TrainingHotkeys = pcall(require, "func/Training_Hotkeys")
+    if ok and ok2 and HitConfirmHotkeys and TrainingHotkeys then
+        local function adjust_amount(delta)
+            if user_config.session_mode == "timer" then
+                user_config.timer_minutes = math.max(1, (user_config.timer_minutes or 5) + delta)
+                hc_ticker("TIMER: " .. user_config.timer_minutes .. " min")
+            else
+                user_config.trial_count = math.max(1, (user_config.trial_count or 20) + delta)
+                hc_ticker("TRIALS: " .. user_config.trial_count)
+            end
+        end
+        HitConfirmHotkeys.init({
+            decrease_amount = function() adjust_amount(-1) end,
+            increase_amount = function() adjust_amount(1) end,
+            reset_or_stop = function()
+                if session.is_running then do_stop() else do_reset() end
+            end,
+            start_or_pause = function()
+                if session.is_running then do_pause() else do_start() end
+            end,
+        }, TrainingHotkeys)
+    end
+end

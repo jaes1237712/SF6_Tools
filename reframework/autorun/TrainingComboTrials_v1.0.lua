@@ -1530,6 +1530,23 @@ function unique_resources.capture_for_fighter(fighter_id, unique_data, side_key)
                 end
             end)
         end
+
+        -- LOCAL EXTENSION: install timers activated IN-GAME (Denjin Charge,
+        -- Feng Shui Engine, etc.) show a live cPlayer.style_timer > 0 while the
+        -- menu setting is still 0 (Standard). Record the install as active
+        -- (setting value 1 = Activated/Maximum) so the trial re-applies it.
+        if resource.kind == "timer" then
+            pcall(function()
+                local p = (side_key == "p2") and GS.p2 or GS.p1
+                local st = p and tonumber(tostring(p:get_field("style_timer")))
+                if st and st > 0 then
+                    local menu_val = unique[resource.id] or 0
+                    if menu_val == 0 then
+                        unique[resource.id] = 1
+                    end
+                end
+            end)
+        end
     end
 
     if next(unique) == nil then return nil end
@@ -2475,18 +2492,23 @@ local function refresh_combo_list(recent_saved_player)
 end
 
 -- =========================================================
--- PAD SHORTCUTS SYSTEM (FUNC + D-PAD)
--- Extracted to func/ComboTrials_Hotkeys.lua (init below, before UI init)
+-- HOTKEYS: shared multi-device framework (Training_Hotkeys). Combo trials
+-- registers a scope; bindings/menu are owned by Training_Hotkeys.
 -- =========================================================
 local ComboTrials_Hotkeys = require("func/ComboTrials_Hotkeys")
+local TrainingHotkeys = require("func/Training_Hotkeys")
 
 local POS_TICKER_NAMES = { "ANY POSITION", "EXACT POSITION", "MIRROR POSITION" }
 local function ct_ticker(msg)
     if _G.show_custom_ticker then _G.show_custom_ticker(msg, 0.3) end
 end
 
-local function handle_combo_shortcuts()
-    return ComboTrials_Hotkeys.handle_combo_shortcuts()
+local function cycle_position_mode()
+    d2d_cfg.forced_position_idx = (d2d_cfg.forced_position_idx or 1) + 1
+    if d2d_cfg.forced_position_idx > 3 then d2d_cfg.forced_position_idx = 1 end
+    save_d2d_config()
+    apply_forced_position()
+    ct_ticker("POSITION: " .. (POS_TICKER_NAMES[d2d_cfg.forced_position_idx] or ""))
 end
 
 -- =========================================================
@@ -4404,7 +4426,6 @@ re.on_frame(function()
 
     ct_handle_first_frame_init()
     _G.ComboTrials_HideNativeHUD = (trial_state.is_recording or trial_state.is_playing)
-    handle_combo_shortcuts()
 
     local is_game_paused = GS.in_pause_menu
     ct_handle_pause_positions(is_game_paused, _in_replay)
@@ -4820,25 +4841,74 @@ sf6_menu_state = { active = false, x = 0, y = 0, w = 0, h = 0 }
 ctx.sf6_menu_state = sf6_menu_state
 
 
-ComboTrials_Hotkeys.init(ctx, {
-    trial_state = trial_state,
-    file_system = file_system,
-    players = players,
-    demo_state = demo_state,
-    d2d_cfg = d2d_cfg,
-    assign_groups = assign_groups,
-    reinject_trial_vital = reinject_trial_vital,
-    apply_forced_position = apply_forced_position,
-    start_recording = start_recording,
-    stop_recording_and_save = stop_recording_and_save,
-    cancel_recording = cancel_recording,
-    load_and_start_trial = load_and_start_trial,
-    save_d2d_config = save_d2d_config,
-    ct_ticker = ct_ticker,
-    POS_TICKER_NAMES = POS_TICKER_NAMES,
-    ComboTrials_D2D = ComboTrials_D2D,
-    _td_gamepad = _td_gamepad,
-})
+-- Command surface bound by the hotkey scope (mirrors SF6_TOOLS_CC)
+local function ct_is_replay_ctx()
+    return _G.IsInReplay == true or _G.IsInBattleHub == true or _G.FlowMapID == 10
+end
+ctx.commands = {
+    record_p1 = function()
+        if ct_is_replay_ctx() then _G.ComboTrials_ReplaySavePlayer = 0 end
+        start_recording(0); ct_ticker("RECORDING")
+    end,
+    record_p2 = function()
+        if ct_is_replay_ctx() then _G.ComboTrials_ReplaySavePlayer = 1 end
+        start_recording(1); ct_ticker("RECORDING")
+    end,
+    save_recording = function()
+        if not trial_state.is_recording then return end
+        _G.ComboTrials_ReplaySavePlayer = trial_state.recording_player
+        stop_recording_and_save(); ct_ticker("RECORDING SAVED")
+    end,
+    cancel_recording = function()
+        if not trial_state.is_recording then return end
+        _G.ComboTrials_ReplayCancelPlayer = trial_state.recording_player
+        cancel_recording(); ct_ticker("RECORDING CANCELLED")
+    end,
+    start_trial = function()
+        load_and_start_trial(0); ct_ticker("TRIAL STARTED")
+    end,
+    reset_trial = function()
+        if demo_state and demo_state.is_playing then
+            if ctx.start_demo then ctx.start_demo() end
+        elseif trial_state.is_playing then
+            local pi = trial_state.playing_player or 0
+            local paths = (pi == 0) and file_system.saved_combos_paths_p1 or file_system.saved_combos_paths_p2
+            local idx = (pi == 0) and (file_system.selected_file_idx_p1 or 1) or (file_system.selected_file_idx_p2 or 1)
+            if paths and paths[idx] then
+                local loaded = json.load_file(paths[idx])
+                if loaded then trial_state.sequence = loaded; assign_groups(trial_state.sequence) end
+            end
+            reset_trial_steps()
+        end
+    end,
+    stop_trial = function()
+        if not trial_state.is_playing and not (demo_state and demo_state.is_playing) then return end
+        if demo_state then demo_state.is_playing = false end
+        trial_state.is_playing = false; ct_ticker("TRIAL STOPPED")
+    end,
+    start_demo = function()
+        if trial_state.is_recording then return end
+        if ctx.start_demo then ctx.start_demo() end
+    end,
+    restart_demo = function()
+        if not (demo_state and demo_state.is_playing) then return end
+        if ctx.start_demo then ctx.start_demo() end
+    end,
+    quit_demo = function()
+        if not (demo_state and demo_state.is_playing) then return end
+        if ctx.stop_demo then ctx.stop_demo() end
+    end,
+    switch_position = function()
+        if trial_state.is_recording then return end
+        cycle_position_mode()
+    end,
+    open_combo_dropdown = function()
+        if trial_state.is_recording then return end
+        _G.ComboTrials_OpenDropdown = true
+    end,
+}
+
+ComboTrials_Hotkeys.init(ctx, TrainingHotkeys)
 
 local ComboTrials_UI = require("func/ComboTrials_UI")
 ComboTrials_UI.init(ctx)

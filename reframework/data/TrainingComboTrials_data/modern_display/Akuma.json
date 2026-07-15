@@ -1,0 +1,764 @@
+{
+  "_meta": {
+    "schema": "xt.modern_display.v1",
+    "character": "Akuma",
+    "updated_at": "2026-07-04",
+    "description": "Modern control display mapping for Akuma, merged with Capcom official frame data candidates."
+  },
+  "17": {
+    "classic_display": "5656 + 6",
+    "modern_display": "5656 + 6",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "18": {
+    "classic_display": "5454 + 4",
+    "modern_display": "5454 + 4",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "480": {
+    "classic_display": "MPMK",
+    "modern_display": "DP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "600": {
+    "classic_display": "LP",
+    "modern_display": "弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "601": {
+    "classic_display": "LP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "602": {
+    "classic_display": "LP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "605": {
+    "classic_display": "MP",
+    "modern_display": "AUTO + 中",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample."
+  },
+  "606": {
+    "classic_display": ">MP",
+    "modern_display": "> 中",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Group-aware follow-up display verified by current Akuma modern control sample. Official candidate differs: 中 > 中. Current display kept because it matches verified modern sample/group display. Official candidate differs: 中 > 中. Current display kept because existing mapping may be sample/manual verified."
+  },
+  "608": {
+    "classic_display": "HP",
+    "modern_display": "強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "611": {
+    "classic_display": "LK",
+    "modern_display": "AUTO + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "614": {
+    "classic_display": "MK",
+    "modern_display": "中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "615": {
+    "classic_display": "MK > HK",
+    "modern_display": "中 > 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "617": {
+    "classic_display": "HK",
+    "modern_display": "AUTO + 強",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample."
+  },
+  "622": {
+    "classic_display": "2 + LP",
+    "modern_display": "2 + 弱 > 2 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "623": {
+    "classic_display": "2 + LP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "624": {
+    "classic_display": "2 + LP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "627": {
+    "classic_display": "2 + MP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "630": {
+    "classic_display": "2 + HP",
+    "modern_display": "2 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "635": {
+    "classic_display": "2 + LK",
+    "modern_display": "2 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "636": {
+    "classic_display": "2 + LK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "637": {
+    "classic_display": "2 + LK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "640": {
+    "classic_display": "2 + MK",
+    "modern_display": "2 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "643": {
+    "classic_display": null,
+    "modern_display": "3 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "650": {
+    "classic_display": "空中 LP",
+    "modern_display": "空中 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "651": {
+    "classic_display": "空中 MP",
+    "modern_display": "空中 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "652": {
+    "classic_display": "空中 HP",
+    "modern_display": "空中 AUTO + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "653": {
+    "classic_display": "空中 LK",
+    "modern_display": "空中 AUTO + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "654": {
+    "classic_display": "空中 MK",
+    "modern_display": "空中 AUTO + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "655": {
+    "classic_display": "空中 HK",
+    "modern_display": "空中 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "657": {
+    "classic_display": "空中 2 + MK",
+    "modern_display": "空中 2 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "661": {
+    "classic_display": "6 + MP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "664": {
+    "classic_display": "6 + MK",
+    "modern_display": "6 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "667": {
+    "classic_display": "6 + HP",
+    "modern_display": "6 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "668": {
+    "classic_display": "6 + HP > 6 + HP",
+    "modern_display": "6 + 強 > 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "669": {
+    "classic_display": "6 + HP > 6 + HP > HK",
+    "modern_display": "6 + 強 > 強 > 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "671": {
+    "classic_display": "4 + HK",
+    "modern_display": "4 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "672": {
+    "classic_display": "4HK",
+    "modern_display": "4 + 強",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample; exact official notation still needs confirmation. Not found in official generated candidate; kept because it is required by verified modern sample."
+  },
+  "715": {
+    "classic_display": "（近距離で）N or 6 + LPLK",
+    "modern_display": "（近距離で）N or 6 + 弱中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "717": {
+    "classic_display": "（近距離で）4 + LPLK",
+    "modern_display": "（近距離で）4 + 弱中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "739": {
+    "classic_display": "（必殺技キャンセル可能な攻撃ヒット中に）5656 + 6 or (N or 6) + MPMK",
+    "modern_display": "（必殺技キャンセル可能な攻撃ヒット中に）5656 + 6 or (N or 6) + DP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "740": {
+    "classic_display": "（ドライブパリィ中に）5656 + MPMK + 6",
+    "modern_display": "（ドライブパリィ中に）5656 + D",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "850": {
+    "classic_display": "（ガード中 or ドライブパリィ成立中に）6 + HPHK",
+    "modern_display": "（ガード中 or ドライブパリィ成立中に）6 + DI",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "854": {
+    "classic_display": "HPHK",
+    "modern_display": "DI",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "900": {
+    "classic_display": "236 + LP",
+    "modern_display": "236 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "901": {
+    "classic_display": "236 + MP",
+    "modern_display": "236 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "902": {
+    "classic_display": "236 + HP",
+    "modern_display": "SP/236 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "903": {
+    "classic_display": "236+HP",
+    "modern_display": "AUTO + SP",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample. Official candidate differs: AUTO + SP/236 + 攻撃二つ. Current display kept because it matches verified modern sample/group display. Official candidate differs: AUTO + SP/236 + 攻撃二つ. Current display kept because existing mapping may be sample/manual verified."
+  },
+  "943": {
+    "classic_display": "空中 236 + LP",
+    "modern_display": "空中 236 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "944": {
+    "classic_display": "空中 236 + MP",
+    "modern_display": "空中 SP/空中 236 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "945": {
+    "classic_display": "空中 236 + HP",
+    "modern_display": "空中 236 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "947": {
+    "classic_display": "（垂直or前ジャンプ中に）236 + LPMPHP",
+    "modern_display": "（垂直or前ジャンプ中に）AUTO + SP/（垂直or前ジャンプ中に）236 + 攻撃二つ",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "949": {
+    "classic_display": "214 + LPMPHP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "952": {
+    "classic_display": "j.236+P",
+    "modern_display": "空中 SP",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample; exact official notation still needs confirmation. Not found in official generated candidate; kept because it is required by verified modern sample."
+  },
+  "961": {
+    "classic_display": "623+LP",
+    "modern_display": "623 + 弱",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample."
+  },
+  "962": {
+    "classic_display": "623 + MP",
+    "modern_display": "623 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "963": {
+    "classic_display": "623 + HP",
+    "modern_display": "6 + SP/623 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "964": {
+    "classic_display": "623 + LPMPHP",
+    "modern_display": "6 + AUTO + SP/623 + 攻撃二つ",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "973": {
+    "classic_display": "214 + LP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "974": {
+    "classic_display": "214 + MP",
+    "modern_display": "4 + SP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "975": {
+    "classic_display": "214 + HP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "976": {
+    "classic_display": "214 + LPMPHP",
+    "modern_display": "4 + AUTO + SP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "977": {
+    "classic_display": "214 + LP > 6 + LP | MP | HP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "978": {
+    "classic_display": "214+PP",
+    "modern_display": "4 + SP > 6 + 攻撃",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample; exact official notation still needs confirmation."
+  },
+  "979": {
+    "classic_display": "214 + HP > 6 + LP | MP | HP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "980": {
+    "classic_display": "214 + LPMPHP > 6 + LP | MP | HP",
+    "modern_display": "4 + AUTO + SP > 6 + 攻撃",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "986": {
+    "classic_display": ">6+P",
+    "modern_display": "> 6 + 攻撃",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Contextual follow-up display verified by current Akuma modern control sample; exact official notation still needs confirmation. Official candidate differs: null. Current display kept because it matches verified modern sample/group display. Official candidate differs: None. Current display kept because existing mapping may be sample/manual verified."
+  },
+  "987": {
+    "classic_display": "236 + MK",
+    "modern_display": "2 + SP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "988": {
+    "classic_display": "236 + HK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "989": {
+    "classic_display": "236 + LKMKHK",
+    "modern_display": "2 + AUTO + SP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "992": {
+    "classic_display": "236+KK",
+    "modern_display": "2 + SP",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample; exact official notation still needs confirmation. Not found in official generated candidate; kept because it is required by verified modern sample."
+  },
+  "995": {
+    "classic_display": "（百鬼襲中に） LK | MK | HK",
+    "modern_display": "（百鬼襲中に）攻撃",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "996": {
+    "classic_display": "（百鬼襲中に）MK",
+    "modern_display": "（百鬼襲中に）中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "997": {
+    "classic_display": "（百鬼襲中に）HK",
+    "modern_display": "（百鬼襲中に）強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "998": {
+    "classic_display": "（百鬼襲中に）LP | MP | HP",
+    "modern_display": "（百鬼襲中に）SP",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1001": {
+    "classic_display": "LK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1002": {
+    "classic_display": "MK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1003": {
+    "classic_display": "HK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1013": {
+    "classic_display": "214 + LK",
+    "modern_display": "214 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1015": {
+    "classic_display": "214 + MK",
+    "modern_display": "214 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1018": {
+    "classic_display": "214 + HK",
+    "modern_display": "214 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1022": {
+    "classic_display": "214+HK",
+    "modern_display": "4 + SP",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample; exact official notation still needs confirmation. Not found in official generated candidate; kept because it is required by verified modern sample."
+  },
+  "1023": {
+    "classic_display": "214 + LKMKHK",
+    "modern_display": "214 + 攻撃二つ",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1026": {
+    "classic_display": "空中 214 + LK | MK | HK",
+    "modern_display": "空中 4 + SP/空中 214 + 攻撃",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1027": {
+    "classic_display": "214+KK",
+    "modern_display": "空中 4 + AUTO + SP",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample. Official candidate differs: 空中 4 + AUTO + SP/空中 214 + 攻撃二つ. Current display kept because it matches verified modern sample/group display. Official candidate differs: 空中 4 + AUTO + SP/空中 214 + 攻撃二つ. Current display kept because existing mapping may be sample/manual verified."
+  },
+  "1029": {
+    "classic_display": "（OD百鬼襲中に）214 + LK | MK | HK",
+    "modern_display": "（OD百鬼襲中に）AUTO + 攻撃",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1075": {
+    "classic_display": "6 + LKMKHKLK|MK|HK",
+    "modern_display": "6 + 弱中強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1081": {
+    "classic_display": "4 + LKMKHKLK|MK|HK",
+    "modern_display": "4 + 弱中強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1087": {
+    "classic_display": "（阿修羅閃空（前方）中に）LPLK",
+    "modern_display": "（阿修羅閃空（前方）中に）弱中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1158": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1159": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1160": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1162": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1163": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1165": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1166": {
+    "classic_display": null,
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1200": {
+    "classic_display": "236236 + LP | MP | HP",
+    "modern_display": "5 or 6 + 強SP/236236 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1208": {
+    "classic_display": "（垂直or前ジャンプ中に）236236 + LK | MK | HK",
+    "modern_display": "（垂直or前ジャンプ中に）強SP/（垂直or前ジャンプ中に）236236 + 弱",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1213": {
+    "classic_display": "214214 + LP | MP | HP",
+    "modern_display": "4 + 強SP/214214 + 中",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1214": {
+    "classic_display": "21424 | 24214 + LP | MP | HP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1220": {
+    "classic_display": "236236 + LK | MK | HK",
+    "modern_display": "2 + 強SP/236236 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1221": {
+    "classic_display": "23626 | 26236 + LK | MK | HK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1225": {
+    "classic_display": "（体力25%以下で）236236 + LK | MK | HK",
+    "modern_display": "（体力25%以下で）2 + 強SP/236236 + 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data. Needs review before using for sample-specific display."
+  },
+  "1226": {
+    "classic_display": "236236+K",
+    "modern_display": "2 + SP + 強",
+    "control_support": "classic_modern",
+    "source": "community_sample",
+    "note": "Verified by current Akuma modern control sample; exact official notation still needs confirmation. Official candidate differs: null. Current display kept because it matches verified modern sample/group display. Official candidate differs: None. Current display kept because existing mapping may be sample/manual verified."
+  },
+  "1231": {
+    "classic_display": "LP > LP > 6 > LK > HP",
+    "modern_display": "弱 > 弱 > 中 > 強",
+    "control_support": "classic_modern",
+    "source": "capcom_official",
+    "note": "Generated from Capcom official frame data."
+  },
+  "1240": {
+    "classic_display": "5252 + LPMPHP",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1244": {
+    "classic_display": "214214 + LK | MK | HK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1495": {
+    "classic_display": "2 + LPMPHPLKMKHK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  },
+  "1497": {
+    "classic_display": "LPMPHPLKMKHK",
+    "modern_display": null,
+    "control_support": "classic_only",
+    "source": "capcom_official",
+    "note": "No modern command found in official data."
+  }
+}

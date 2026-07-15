@@ -9,6 +9,7 @@ require("func/SharedHooks") -- error registry (_G.safe_load_json) + shared hooks
 local GS = require("func/GameState")
 local UIKit = require("func/UIKit")
 local RuntimeSafety = require("func/RuntimeSafety")
+local TrainingHotkeys = require("func/Training_Hotkeys")
 
 -- ==========================================
 -- CUSTOM TICKER SYSTEM
@@ -846,6 +847,7 @@ re.on_frame(function()
     -- ABSOLUTE KILLSWITCH: No gamepad reading or logic outside training
     _G.TrainingModeActive = is_in_training_mode()
     if _G.TrainingModeActive then RuntimeSafety.allow_training() end
+    pcall(TrainingHotkeys.update, not _G.TrainingModeActive)
     if not _G.TrainingModeActive then
         -- AUTO-RESET: Disable all active modes when leaving Training Mode
         if _G.CurrentTrainerMode ~= 0 then
@@ -1006,6 +1008,14 @@ re.on_draw_ui(function()
         end
 
         -- ==========================================
+        -- SECTION 2b: HOTKEY BINDINGS (shared multi-device framework)
+        -- ==========================================
+        if styled_header("--- HOTKEY BINDINGS ---", UI_THEME.hdr_config) then
+            imgui.text_colored("Bind training actions to keyboard, pad or in-game inputs.", 0xFF888888)
+            imgui.text_colored("Scopes are OFF by default: enable a scope, then Bind each action.", 0xFF888888)
+            pcall(TrainingHotkeys.draw_menu)
+        end
+
         -- SECTION 2: CONTROLLER CONFIG
         -- ==========================================
         if styled_header("--- CONTROLLER CONFIG ---", UI_THEME.hdr_config) then

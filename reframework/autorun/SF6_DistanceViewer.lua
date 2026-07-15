@@ -4188,4 +4188,18 @@ local function draw_distance_viewer_menu_ui()
     end
 end
 
+-- Shared hotkey framework: register the distance-viewer scope (additive,
+-- disabled by default; existing behavior unchanged)
+do
+    local ok, DistanceViewerHotkeys = pcall(require, "func/DistanceViewer_Hotkeys")
+    local ok2, TrainingHotkeys = pcall(require, "func/Training_Hotkeys")
+    if ok and ok2 and DistanceViewerHotkeys and TrainingHotkeys then
+        DistanceViewerHotkeys.init({
+            cycle_p1 = function() cycle_player_display("p1"); save_settings() end,
+            cycle_p2 = function() cycle_player_display("p2"); save_settings() end,
+            toggle_window = function() config.enabled = not config.enabled; save_settings() end,
+        }, TrainingHotkeys)
+    end
+end
+
 re.on_draw_ui(draw_distance_viewer_menu_ui)
