@@ -480,10 +480,56 @@ end
 -- =========================================================
 -- SHARED IMPORT / EXPORT FUNCTION
 -- =========================================================
+-- =========================================================
+-- IMPORT SAFETY (SF6_TOOLS_CC-inspired): validation + pre-import backup
+-- =========================================================
+local serialize_slots_data  -- assigned below export section (needs decode helpers)
+local _rsm_last_backup_clock = {}
+
+local function validate_slot_data(data_table)
+    if type(data_table) ~= "table" or #data_table == 0 then
+        return false, "empty or invalid slot data"
+    end
+    for _, s in ipairs(data_table) do
+        if type(s) ~= "table" or type(s.id) ~= "number" or s.id < 1 or s.id > 8 then
+            return false, "invalid slot entry (bad id)"
+        end
+        if not s.empty and type(s.timeline) ~= "table" and type(s.inputs) ~= "table" then
+            return false, "slot " .. tostring(s.id) .. " has no timeline/inputs"
+        end
+    end
+    return true
+end
+
+-- Snapshots the LIVE slots to a timestamped backup before any import write.
+-- Deduped (5s) because WRITE_DATA can re-enter after memory allocation.
+local function backup_live_slots(use_id, reason)
+    if not serialize_slots_data then return end
+    local now = os.clock()
+    if _rsm_last_backup_clock[use_id] and (now - _rsm_last_backup_clock[use_id]) < 5 then return end
+    _rsm_last_backup_clock[use_id] = now
+    local data, p2_name = serialize_slots_data(use_id)
+    if not data or not p2_name then return end
+    local folder = get_char_folder(p2_name) .. "/Backups"
+    if fs.create_dir then pcall(fs.create_dir, folder) end
+    local fname = folder .. "/" .. p2_name .. "_pre_import_" .. os.date("%Y%m%d_%H%M%S") .. ".json"
+    json.dump_file(fname, data)
+end
+
 local function apply_data_to_character(target_id, data_table, source_name, live_slot_idx)
     local use_id = target_id or current_p2_id
+
+    local v_ok, v_err = validate_slot_data(data_table)
+    if not v_ok then
+        return "Import rejected (" .. tostring(source_name) .. "): " .. tostring(v_err)
+    end
+
     local slots, err = get_slots_access(use_id)
     if not slots then return "Error: " .. tostring(err) end
+
+    -- Automatic pre-import backup of the live slots (restore = import the
+    -- newest file from <char>/Backups/)
+    pcall(backup_live_slots, use_id, source_name)
     
     local missing_memory_slots = {}
     
@@ -769,10 +815,12 @@ end)
 -- =========================================================
 -- IMPORT / EXPORT STANDARDS
 -- =========================================================
-local function export_json_compressed(target_id)
+-- Serializes the live slots of a character to the compressed timeline shape
+-- (shared by export and pre-import backups)
+serialize_slots_data = function(target_id)
     local use_id = target_id or current_p2_id
     local slots, err = get_slots_access(use_id)
-    if not slots then return "Error: " .. tostring(err) end
+    if not slots then return nil, nil, err end
 
     local export_data = {}
     local p2_name = get_char_name(use_id)
@@ -810,6 +858,12 @@ local function export_json_compressed(target_id)
         end
         table.insert(export_data, slot_entry)
     end
+    return export_data, p2_name
+end
+
+local function export_json_compressed(target_id)
+    local export_data, p2_name, err = serialize_slots_data(target_id)
+    if not export_data then return "Error: " .. tostring(err) end
     local save_path = get_char_folder(p2_name) .. "/" .. p2_name .. "_Base.json"
     json.dump_file(save_path, export_data)
     update_saved_state_reference()
