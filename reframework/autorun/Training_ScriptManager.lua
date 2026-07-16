@@ -10,6 +10,30 @@ local GS = require("func/GameState")
 local UIKit = require("func/UIKit")
 local RuntimeSafety = require("func/RuntimeSafety")
 local TrainingHotkeys = require("func/Training_Hotkeys")
+local i18n = require("func/i18n")
+i18n.register("scriptmanager", {
+    en = {
+        lang_label = "Language",
+        modes = "--- TRAINING MODES ---",
+        hotkeys = "--- HOTKEY BINDINGS ---",
+        controller = "--- CONTROLLER CONFIG ---",
+        help = "--- HELP & SHORTCUTS ---",
+        hotkeys_hint1 = "Bind training actions to keyboard, pad or in-game inputs.",
+        hotkeys_hint2 = "Scopes are OFF by default: enable a scope, then Bind each action.",
+        waiting = "[!] INACTIVE: Waiting for Training Mode...",
+    },
+    zh = {
+        lang_label = "语言",
+        modes = "--- 训练模式 ---",
+        hotkeys = "--- 快捷键设置 ---",
+        controller = "--- 手柄配置 ---",
+        help = "--- 模式说明 ---",
+        hotkeys_hint1 = "将训练动作绑定到键盘、手柄或游戏内输入。",
+        hotkeys_hint2 = "作用域默认关闭：先启用作用域，再为每个动作绑定。",
+        waiting = "[!] 未激活：等待进入训练模式……",
+    },
+})
+local T_sm = i18n.scope("scriptmanager")
 
 -- ==========================================
 -- CUSTOM TICKER SYSTEM
@@ -981,9 +1005,20 @@ re.on_draw_ui(function()
     if _has_errors then imgui.pop_style_color(1) end
     if _tsm_open then
 
+        -- Language toggle (per-language UI split: EN / 中文)
+        do
+            local cur = i18n.get_lang()
+            imgui.text(T_sm("lang_label") .. ":")
+            imgui.same_line()
+            if imgui.button((cur == "en" and "[EN]" or "EN") .. "##uilang_en") then i18n.set_lang("en") end
+            imgui.same_line()
+            if imgui.button((cur == "zh" and "[中文]" or "中文") .. "##uilang_zh") then i18n.set_lang("zh") end
+            imgui.separator()
+        end
+
         -- If not in training, show a waiting message and block the UI
         if not is_in_training_mode() then
-            imgui.text_colored("[!] INACTIVE: Waiting for Training Mode...", 0xFF00A5FF)
+            imgui.text_colored(T_sm("waiting"), 0xFF00A5FF)
             imgui.tree_pop()
             return
         end
@@ -991,7 +1026,7 @@ re.on_draw_ui(function()
         -- ==========================================
         -- SECTION 1: MODE SELECTION
         -- ==========================================
-        if styled_header("--- TRAINING MODES ---", UI_THEME.hdr_modes) then
+        if styled_header(T_sm("modes"), UI_THEME.hdr_modes) then
             local c0, v0 = imgui.checkbox("DISABLED", _G.CurrentTrainerMode == 0)
             if c0 and v0 then _G.CurrentTrainerMode = 0 end
 
@@ -1014,15 +1049,15 @@ re.on_draw_ui(function()
         -- ==========================================
         -- SECTION 2b: HOTKEY BINDINGS (shared multi-device framework)
         -- ==========================================
-        if styled_header("--- HOTKEY BINDINGS ---", UI_THEME.hdr_config) then
-            imgui.text_colored("Bind training actions to keyboard, pad or in-game inputs.", 0xFF888888)
-            imgui.text_colored("Scopes are OFF by default: enable a scope, then Bind each action.", 0xFF888888)
+        if styled_header(T_sm("hotkeys"), UI_THEME.hdr_config) then
+            imgui.text_colored(T_sm("hotkeys_hint1"), 0xFF888888)
+            imgui.text_colored(T_sm("hotkeys_hint2"), 0xFF888888)
             pcall(TrainingHotkeys.draw_menu)
         end
 
         -- SECTION 2: CONTROLLER CONFIG
         -- ==========================================
-        if styled_header("--- CONTROLLER CONFIG ---", UI_THEME.hdr_config) then
+        if styled_header(T_sm("controller"), UI_THEME.hdr_config) then
             if is_binding_mode then
                 imgui.spacing()
                 imgui.push_style_color(5, 0xFF00FFFF)
@@ -1134,7 +1169,7 @@ re.on_draw_ui(function()
         -- ==========================================
         -- SECTION 3: HELP & SHORTCUTS
         -- ==========================================
-        if styled_header("--- HELP & SHORTCUTS ---", UI_THEME.hdr_help) then
+        if styled_header(T_sm("help"), UI_THEME.hdr_help) then
             local fn = SharedUI.get_func_name()
 
             imgui.text_colored("HOW TO SWITCH MODES", 0xFF00FFFF)

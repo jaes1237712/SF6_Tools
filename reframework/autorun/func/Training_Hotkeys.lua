@@ -14,19 +14,45 @@ local sdk = sdk
 
 local M = {}
 
--- Localizable chrome strings (the only language-specific part of the module)
-local L = {
-    unbound   = "Unbound",
-    bind      = "Bind",
-    clear     = "Clear",
-    bound     = "Bound: ",
-    capturing = "Press a key or device button; ESC to cancel.",
-    conflict  = "Conflict: ",
-    enable    = "Enable ",
-    enable_suffix = " hotkeys",
-    probe     = "Device probe: HID=0x%X  game=0x%X  last=%s",
-    no_scopes = "No modules registered hotkey actions.",
-}
+-- Localizable chrome strings routed through the shared i18n registry so the
+-- hotkey menu follows the global EN/中文 toggle. `L.key` resolves live.
+local i18n = require("func/i18n")
+i18n.register("hotkeys", {
+    en = {
+        unbound   = "Unbound",
+        bind      = "Bind",
+        clear     = "Clear",
+        bound     = "Bound: ",
+        capturing = "Press a key or device button; ESC to cancel.",
+        conflict  = "Conflict: ",
+        enable    = "Enable ",
+        enable_suffix = " hotkeys",
+        probe     = "Device probe: HID=0x%X  game=0x%X  last=%s",
+        no_scopes = "No modules registered hotkey actions.",
+    },
+    zh = {
+        unbound   = "未绑定",
+        bind      = "绑定",
+        clear     = "清除",
+        bound     = "当前绑定: ",
+        capturing = "请按键或设备按钮；ESC 取消。",
+        conflict  = "冲突: ",
+        enable    = "启用 ",
+        enable_suffix = " 快捷键",
+        probe     = "设备检测: HID=0x%X  游戏输入=0x%X  最近来源=%s",
+        no_scopes = "暂无模块注册快捷键动作。",
+    },
+})
+local L = setmetatable({}, { __index = function(_, k) return i18n.t("hotkeys", k) end })
+
+-- title/label may be a plain string or a function (live i18n resolution)
+local function resolve_text(v)
+    if type(v) == "function" then
+        local ok, r = pcall(v)
+        return ok and r or ""
+    end
+    return v
+end
 
 local CONFIG_FILE = "Training_ScriptManager_data/TrainingHotkeys_Config.json"
 
@@ -390,7 +416,7 @@ local function find_conflicts(scope_id, action_id)
             for _, aid in ipairs(scope.action_order) do
                 if not (sid == scope_id and aid == action_id) and binding_key(scope_cfg.bindings[aid]) == target then
                     local action = scope.actions[aid]
-                    hits[#hits + 1] = (scope.title or sid) .. " / " .. ((action and action.label) or aid)
+                    hits[#hits + 1] = (resolve_text(scope.title) or sid) .. " / " .. (resolve_text(action and action.label) or aid)
                 end
             end
         end
@@ -494,7 +520,7 @@ end
 
 local function draw_scope(scope)
     local scope_cfg = ensure_scope_config(scope.id, scope.enabled_default)
-    local changed, enabled = imgui.checkbox(L.enable .. scope.title .. L.enable_suffix .. "##hk_enabled_" .. scope.id, scope_cfg.enabled == true)
+    local changed, enabled = imgui.checkbox(L.enable .. resolve_text(scope.title) .. L.enable_suffix .. "##hk_enabled_" .. scope.id, scope_cfg.enabled == true)
     if changed then
         scope_cfg.enabled = enabled == true
         save_config()
@@ -505,7 +531,7 @@ local function draw_scope(scope)
         if action then
             imgui.separator()
             local cap = capture and capture.scope_id == scope.id and capture.action_id == action_id
-            draw_action_row(action.label or action_id, M.combo_name(scope_cfg.bindings[action_id]), function()
+            draw_action_row(resolve_text(action.label) or action_id, M.combo_name(scope_cfg.bindings[action_id]), function()
                 if cap then
                     imgui.text_colored(L.capturing, 0xFF00A5FF)
                     return
@@ -547,7 +573,7 @@ function M.draw_menu()
     end
     for _, scope_id in ipairs(scope_order) do
         local scope = registry[scope_id]
-        if scope and imgui.tree_node(scope.title .. "##hotkeys_" .. scope_id) then
+        if scope and imgui.tree_node(resolve_text(scope.title) .. "##hotkeys_" .. scope_id) then
             draw_scope(scope)
             imgui.tree_pop()
         end
