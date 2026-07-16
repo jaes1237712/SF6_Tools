@@ -837,6 +837,10 @@ re.on_frame(function()
         end
         -- In replay: always return, no top bar, no guard logic
         _G.TrainingFloatingBarTop = nil
+        -- Hotkeys: keep config loaded in replay but do NOT fire (matches
+        -- SF6_TOOLS_CC). NOTE: replay/spectate recording via hotkey is
+        -- therefore unavailable through the framework.
+        pcall(TrainingHotkeys.update, true)
         return
     end
 
