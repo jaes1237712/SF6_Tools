@@ -4197,7 +4197,7 @@ do
         DistanceViewerHotkeys.init({
             cycle_p1 = function() cycle_player_display("p1"); save_settings() end,
             cycle_p2 = function() cycle_player_display("p2"); save_settings() end,
-            toggle_window = function() config.enabled = not config.enabled; save_settings() end,
+            toggle_window = function() config.show_debug_window = not config.show_debug_window; save_settings() end,
         }, TrainingHotkeys)
     end
 end
